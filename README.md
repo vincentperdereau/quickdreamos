@@ -4,3 +4,6 @@ A small operating system (OS) written in ASM / C (Borland), in the early 2000s i
 
 Needed : 
 Borland C++ 7
+
+Information : vincentperdereau@yahoo.fr
+
