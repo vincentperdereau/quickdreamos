@@ -1,0 +1,64 @@
+/*
+ * dreamos/src/kernel/main.c
+ *
+ * creation: 13/12/1999,vincent.perdereau@lemel.fr
+ *
+ * Fichier principal du noyau.
+ *
+ * ==> adresse 1000:0000
+ *
+ */
+
+ #define        KERNEL_SEG       0x1000
+ #define        INIT_SEG         0x2000
+
+ #include <typedef.h>                // diverses structures
+ #include <string.h>                 // chaines de caractŠres
+ #include <sys/mm/memory.h>          // m‚moire
+ #include <sys/disk/disk.h>          // gestion du disque (ecriture/lecture)
+ #include <sys/fs/tinyfs/tinyfs.h>   // SystŠme de Fichiers
+ #include <sys/krnbox/krnbox.h>      // Interruption utilis‚ par le noyau
+
+ ULONG handle;
+
+
+#ifdef BUFFER
+ ULONG t_adr;
+ UINT t_h, t_c, t_s; 
+
+ extern BOOL r_disk_access (UCHAR,int,int,int,int,void*,UINT,int) ;
+#endif
+
+ PROC kernel_entry (UCHAR boot_drive)
+ {
+
+  init_disk (boot_drive); // on initialise le lecteur en usage
+
+#ifdef BUFFER
+// section used only for buffered usage
+  for ( t_h = 0 ; t_h <= 1 ; t_h++)
+  {
+   for ( t_c = 0 ; t_c <= 18 ; t_c++)
+   {
+    r_disk_access (0,t_h,t_c,1,18,0,0x6000,2);
+    disk_access (0,t_h,t_c,1,18,0,0x6000,3);
+    asm {
+     mov ah,0eh
+     mov al,219
+     int 10h
+    }
+   }
+  }
+#endif
+
+  handle = f_open ("init"); // on ouvre le fichier 'init'
+  if (handle < 2) ; // erreur, fichier introuvable
+  // on charge le fichier … l'adresse 2000:0000
+  else f_read (handle,f_size (handle),INIT_SEG,0x0000);
+
+  krnbox_setup (); // on installe l'interruption du noyau
+
+  // on effectue un saut … l'adresse 2000:0000: init
+
+  asm { DB 0xEA ; DW 0x0000 ; DW 0x2000 ; }
+ }

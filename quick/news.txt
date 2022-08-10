@@ -1,0 +1,28 @@
+Nouveaut‚s:
+
+- la gestion de la m‚moire ( mmap, pour visualiser le mapping )
+- la gestion de diff‚rents claviers [heinz.rath@gmx.at]
+- une documentation plus fournie
+- des programmes … compiler sous quick (repertoire /src/)
+- des fonts suppl‚mentaires
+- enfin des *.h sans code !
+- carte son CS4235 [heinz.rath@gmx.at]
+- un d‚but de gestion des Threads (egthread.asm)
+
+Quick se d‚cline en deux versions:
+- classique: -
+
+
+- bufferis‚e: trŠs rapide (!), mais tout nouveau fichier sera perdu
+              au moment du reset, ou de l'arret de l'ordinateur.
+              ( exclusivement pour disquette !!)
+              ( Il est toutefois possible de mettre … jour le systeme
+                avec les binaires 'flush' et 'refresh' )
+
+Le choix entre les deux versions s'effectue … travers le Makefile ( /kernel/ )
+
+* Il est fortement conseill‚ de ne pas utiliser 'ng' sans la version
+  bufferis‚e.
+* une souris s‚rie COM1 est indispensable … l'utilisation de 'ng'
+* 'xsh' ne pas etre utilis‚ avec la version bufferis‚e (conflit avec
+   la m‚moire haute )
