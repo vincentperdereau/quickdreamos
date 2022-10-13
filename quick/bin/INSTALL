@@ -1,0 +1,154 @@
+clear
+off
+echo QuickDreamOS Installation script file
+echo -------------------------------------
+echo
+pause
+rem Enlever 'exit' si vous etes vraiment sur de vous !!! 
+exit
+echo [*] Making filesystem (tinyfs)
+mkfs c
+echo [*] Copying kernel sectors
+sys c
+echo [*] Copying system files
+cp a:/init c:/init
+cp a:/sh c:/sh
+echo [*] Making directories structure
+c:
+echo etc/
+mkdir etc
+echo bin/
+mkdir bin
+echo home/
+mkdir home
+echo dev/
+mkdir dev
+echo doc/
+mkdir doc
+echo lib/
+mkdir lib
+echo src/
+mkdir src
+echo src/system
+mkdir src/system
+echo src/math
+mkdir src/math
+echo src/api
+mkdir src/api
+echo lib/fnt
+mkdir /lib/fnt
+echo lib/kbd
+mkdir /lib/kbd
+echo qwin/
+mkdir qwin
+a:
+echo [*] Copying files
+echo     - scripts
+cp a:/etc/init.rc c:/etc/init.rc
+cp a:/etc/shut.rc c:/etc/shut.rc
+cp a:/etc/system.rc c:/etc/system.rc
+cp a:/etc/qwin.rc c:/etc/qwin.rc
+cp a:/qwin/qwin.ini c:/qwin/qwin.ini
+cp a:/etc/qshut.rc c:/etc/qshut.rc
+cp a:/etc/tools.rc c:/etc/tools.rc
+cp a:/etc/apps.rc c:/etc/apps.rc
+cp a:/etc/term.rc c:/etc/term.rc
+echo     - binaries
+cp a:/bin/xsh c:/bin/xsh
+cp a:/bin/ved c:/bin/ved
+cp a:/bin/mmap c:/bin/mmap
+cp a:/bin/type c:/bin/type
+cp a:/bin/pak c:/bin/pak
+cp a:/bin/debugfs c:/bin/debugfs
+cp a:/bin/date c:/bin/date
+cp a:/bin/hostname c:/bin/hostname
+cp a:/bin/fire c:/bin/fire
+cp a:/bin/kmsg c:/bin/kmsg
+cp a:/bin/as c:/bin/as
+cp a:/bin/ng c:/bin/ng
+cp a:/dev/cua0 c:/dev/cua0
+cp a:/qwin/keyb c:/qwin/keyb
+cp a:/qwin/wpal c:/qwin/wpal
+cp a:/qwin/np c:/qwin/np
+cp a:/qwin/dock c:/qwin/dock
+cp a:/qwin/ds c:/qwin/ds
+cp a:/qwin/exec c:/qwin/exec
+cp a:/qwin/int c:/qwin/int
+cp a:/qwin/logon c:/qwin/logon
+echo     - icons & images
+cp a:/qwin/keyb.ico c:/qwin/keyb.ico
+cp a:/qwin/eye.ico c:/qwin/eye.ico
+cp a:/qwin/color.ico c:/qwin/color.ico
+cp a:/qwin/logon.ico c:/qwin/logon.ico
+cp a:/qwin/exec.ico c:/qwin/exec.ico
+cp a:/qwin/term.ico c:/qwin/term.ico
+cp a:/qwin/shut.ico c:/qwin/shut.ico
+cp a:/qwin/mem.ico c:/qwin/mem.ico
+cp a:/qwin/win.pal c:/qwin/win.pal
+cp a:/qwin/next.pal c:/qwin/next.pal
+cp a:/qwin/boot.fig c:/qwin/boot.fig
+cp a:/qwin/logo.pic c:/qwin/logo.pic
+echo     - documents
+cp a:/doc/api.doc c:/doc/api.doc
+cp a:/doc/sh.doc c:/doc/sh.doc
+cp a:/doc/as.doc c:/doc/as.doc
+echo     - sources
+cp a:/src/system/date.s c:/src/system/date.s
+cp a:/src/system/hostname.s c:/src/system/hostname.s
+cp a:/src/system/mouse.s c:/src/system/mouse.s
+cp a:/src/system/reboot.s c:/src/system/reboot.s
+cp a:/src/math/prime.s c:/src/math/prime.s
+cp a:/src/api/iotst.s c:/src/api/iotst.s
+cp a:/src/api/sysinfo.s c:/src/api/sysinfo.s
+cp a:/src/whello.s c:/src/whello.s
+echo     - keymaps
+cp a:/lib/kbd/keymap c:/lib/kbd/keymap
+cp a:/lib/kbd/fr.map c:/lib/kbd/fr.map
+cp a:/lib/kbd/gr.map c:/lib/kbd/gr.map
+cp a:/lib/kbd/us.map c:/lib/kbd/us.map
+cp a:/lib/kbd/br.map c:/lib/kbd/br.map
+# cp a:/lib/fnt/antique c:/lib/fnt/antique
+# cp a:/lib/fnt/courier c:/lib/fnt/courier
+# cp a:/lib/fnt/script c:/lib/fnt/script
+# cp a:/lib/fnt/medieval c:/lib/fnt/medieval
+echo     - fonts
+cp a:/lib/fnt/breeze.fnt c:/lib/fnt/breeze.fnt
+cp a:/lib/fnt/comp.fnt c:/lib/fnt/comp.fnt
+cp a:/lib/fnt/hylas.fnt c:/lib/fnt/hylas.fnt
+cp a:/lib/fnt/bold.fnt c:/lib/fnt/bold.fnt
+cp a:/lib/fnt/italics.fnt c:/lib/fnt/italics.fnt
+cp a:/lib/fnt/modern.fnt c:/lib/fnt/modern.fnt
+cp a:/lib/fnt/roman.fnt c:/lib/fnt/roman.fnt
+cp a:/lib/shut.bmp c:/lib/shut.bmp
+echo [*] Setting environment
+chmod x c:/bin/ved
+chmod x c:/bin/as
+chmod x c:/bin/xsh
+chmod x c:/bin/type
+chmod x c:/bin/debugfs
+chmod x c:/bin/date
+chmod x c:/bin/pak
+chmod x c:/bin/kmsg
+chmod x c:/bin/hostname
+chmod x c:/bin/fire
+chmod x c:/bin/ng
+chmod x c:/bin/mmap
+chmod x c:/bin/type
+chmod x c:/qwin/exec
+chmod x c:/qwin/logon
+chmod x c:/qwin/int
+chmod s c:/etc/init.rc
+chmod s c:/etc/shut.rc
+chmod s c:/etc/system.rc
+chmod s c:/etc/qwin.rc
+chmod s c:/etc/qshut.rc
+chmod s c:/etc/tools.rc
+chmod s c:/etc/apps.rc
+chmod x c:/sh
+chmod x c:/init
+chmod x c:/qwin/keyb
+chmod x c:/qwin/wpal
+chmod x c:/qwin/np
+chmod x c:/qwin/ds
+echo [*] Installation successfully completed
+on

@@ -1,0 +1,32 @@
+.line
+ * FUNCTION:    Write into a file        
+   NUMBER:      0005h
+   ENTRY:       EDX = handle
+                ECX = number of byte
+                DS:SI = buffer
+   RETURN:      0 = Ok, else error
+.line
+ * FUNCTION:    Change actual drive
+   NUMBER:      0006h
+   ENTRY:       AL = drive (0=a: 0x80=c:)
+   RETURN:      AL = 1 if Ok, else 0
+.line
+ * FUNCTION:    Change actual directory
+   NUMBER:      0007h
+   ENTRY:       DS:SI = asciiz dir name (must '/.' terminated)
+   RETURN:      eax = code dir, ( if 0xffffffff => error)
+.line
+ * FUNCTION:    Create a new directory
+   NUMBER:      0008h
+   ENTRY:       DS:SI = pointer to an asciiz dir name
+   RETURN:      AL = 1, else error
+.line
+.link
+main
+./prog/index.qdl
+.link
+previous
+./prog/api1.qdl
+.link
+next
+./prog/api3.qdl

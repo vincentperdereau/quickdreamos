@@ -1,0 +1,17 @@
+void init (void);
+
+void main ()
+{
+ init ();
+}
+
+unsigned char outb (int port, unsigned char byte)
+{
+ asm { push dx ; push ax ; mov dx,port ; mov al,byte ; out dx,al ; pop ax ; pop dx }
+}
+
+unsigned char inb (int port, unsigned char byte)
+{
+ asm { push dx ; push ax ; mov dx,port ; mov al,byte ; in al,dx ; pop ax ; pop dx }
+}
+

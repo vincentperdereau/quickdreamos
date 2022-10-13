@@ -1,0 +1,27 @@
+.line
+ * FUNCTION:    Get Log Name
+   NUMBER:      0016h
+   ENTRY:       none
+   RETURN:      DS:SI = asciiz name
+.line
+ * FUNCTION:    File Set Attribut
+   NUMBER:      0017h
+   ENTRY:       EDX = file handle
+                CL = attribut
+   RETURN:      AX = 1 if good, else 0
+.line
+ * FUNCTION:    Read a key 
+   NUMBER:      0018h
+   ENTRY:       none
+   RETURN:      AL=character
+.line
+.link
+main
+./prog/index.qdl
+.link
+previous
+./prog/api5.qdl
+.link
+next
+./prog/api7.qdl
+

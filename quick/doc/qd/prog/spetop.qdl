@@ -1,0 +1,21 @@
+.left
+.bold
+Special topics
+.line
+
+.normal
+.underline
+Command line
+
+ES:BX pointer to command line ( eg. "/home/prog/test param1" )
+
+.underline
+Exit a program
+
+Return to the program caller through the 'retf' instruction.
+
+.line
+.black
+.link
+back
+./prog/index.qdl

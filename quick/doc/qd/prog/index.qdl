@@ -1,0 +1,30 @@
+.center
+.bold
+Programmer's Guide
+
+.line
+.left
+.bold
+Sections in this document
+.normal
+.tab
+
+.link
+Application Programming Interface (API)
+./prog/api1.qdl
+.link
+Programming tools
+./prog/tools.qdl
+.link
+Special topics
+./prog/spetop.qdl
+.link
+Examples
+./prog/eg.qdl
+
+.modern
+.line
+.left
+.link
+back
+index.qdl

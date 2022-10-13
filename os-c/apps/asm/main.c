@@ -1,0 +1,878 @@
+//#define FOR_DREAMOS
+
+// pour Windows/DOS: gcc main.c -o main.exe
+// pour DreamOS: makeit.bat
+
+#ifndef FOR_DREAMOS
+#include <stdio.h>
+#include <conio.h>
+#include <stdlib.h>
+#include <string.h>
+#include "arg.h"
+#define handle FILE*
+#endif
+
+#ifdef FOR_DREAMOS
+void start_program (void);
+
+void main ()
+{
+ start_program ();
+ asm { retf };
+}
+#endif
+
+#ifndef FOR_DREAMOS
+void start_program (char* arg1, char* arg2);
+
+void main (int argc, char* argv[])
+{
+ if (argc < 3) { printf ("\nsyntax: %s input output",argv[0]); return;}
+ start_program (argv[1],argv[2]);
+}
+#endif
+
+#ifdef FOR_DREAMOS
+#include	"typedef.h"
+#include        "string.h"
+#include        "arg.h"
+#include	"file.h"
+#include 	"memory.h"
+#endif
+#define         DREAMOS.ASSEMBLER.8088
+
+#ifndef FOR_DREAMOS
+#define		putn(x) printf("%d",x)
+#define		puts(x) printf("%s",x);
+typedef unsigned int uint;
+typedef unsigned char uchar;
+typedef char* string;
+#endif
+
+#ifdef FOR_DREAMOS
+
+#define handle unsigned long
+#define NULL 0
+typedef unsigned int addr;
+
+ addr bufferbatch;
+
+ char peekchar (uint ofs)
+ {
+  asm {
+	push ds
+	push si
+	mov ax,bufferbatch
+	mov ds,ax
+	mov si,ofs
+	lodsb
+	pop si
+	pop ds
+      }
+ }
+
+ int file_offset;
+
+ int fgets (char* s,int in,handle h)
+ {
+  int i;
+  for (i=0; (peekchar (file_offset+i) != 13) && (peekchar (file_offset+i) != 0);i++) s[i] = peekchar (file_offset+i);
+  if (peekchar (file_offset+i) == 0) return 0;
+  s[i] = 0;
+  file_offset += i+2;
+  return 1;
+ }
+
+ typedef        unsigned int    addr;
+
+ addr malloc (unsigned int paragraph)
+ {
+  asm {
+	push bx
+	mov ah,0x0012
+	mov bx,paragraph
+	int 0x44
+	pop bx
+      }
+ }
+
+ void free (addr adr)
+ {
+  asm {
+       push bx
+       mov ah,0x0013
+       mov bx,adr
+       int 0x44
+       pop bx
+      }
+ }
+
+
+void putc (char c)
+{
+ asm {
+	push ax
+	mov al,c
+	int 0x29
+	pop ax
+     }
+}
+
+void putn (unsigned long dw)
+{
+ unsigned long i ; unsigned char b ;
+ int flag=0;
+ for (i=1000000000;i!=0;i/=10)
+ {
+ b = dw / i ; dw = dw - (b*i) ;
+ if (b) flag = 1;
+ if (flag)  putc (b+48) ;
+ }
+}
+
+void puts (char* s)
+{
+ int i;
+ for (i=0; s[i] != 0; i++) putc (s[i]);
+}
+
+extern handle fopen (char*	filename);
+extern handle fcreate (char* fname);
+extern int fread (handle h,long count,void* buffer,unsigned int segm);
+extern int fwrite (handle h,long count,void* buffer,unsigned int segm);
+extern unsigned long fsize (handle h);
+
+#endif
+
+#ifndef FOR_DREAMOS
+unsigned char *binary ;
+#endif
+
+#ifdef FOR_DREAMOS
+unsigned char far *binary ;
+#endif
+
+unsigned int ofs = 0;
+unsigned char ea;
+int op_size ;
+int ligne = 0;
+int xx;
+
+char label [50][20] = { {0,} , {0,} , }; // MAX LABEL
+char wlabel [50][20] ={ {0,} , {0,} , };
+
+unsigned int lab_ofs [50] = {0,};
+unsigned int wlab_ofs [50] = {0,};
+unsigned char wlab_cod [50] = {0,};
+unsigned char op = 0;
+unsigned char actual_code = 0;
+
+
+char reg16 [][8] = { "ax","cx","dx","bx","sp","bp","si","di" };
+char reg8 [][8]  = { "al","cl","dl","bl","ah","ch","dh","bh" };
+char sreg [][4]  = { "es","cs","ss","ds"};
+
+char ofs_bx [] = "[bx]";
+char ofs_si [] = "[si]";
+char ofs_di [] = "[di]";
+
+
+#define jcc_n 36
+
+char *jcc [jcc_n] = {"je","jz","ja","jae","jb","jbe","jc","jcxz","jg",
+		       "jge","jl","jle","jna","jnae","jnb","jnbe","jnc",
+		       "jne","jng","jnge","jnl","jnle","jno","jnp","jns",
+		       "jnz","jo","jp","jpe","jpo","js","loop","loope",
+		       "loopne","loopnz","loopz"};
+
+unsigned char jcc_code [jcc_n] = {0x74,0x74,0x77,0x73,0x72,0x76,0x72,0xE3,
+				  0x7f,0x7d,0x7c,0x7e,0x76,0x72,0x73,
+				  0x77,0x73,0x75,0x7e,0x7c,0x7d,0x7f,0x71,
+				  0x7b,0x79,0x75,0x70,0x7a,0x7a,0x7b,0x78,
+				  0xE2,0xE1,0xE0,0xE0,0xE1};
+#define once_opcode_n 39
+
+struct one_opcode
+{
+ char name[6];
+ unsigned char code;
+};
+
+struct one_opcode once_opcode [once_opcode_n+1] =
+{ "stosb",0xAA,"stosw",0xAB,"scasb",0xAE,"scasw",0xAF,"cld",0xFC,"cmc",0xF5,
+  "cwd",0x99,"nop",0x90,"cbw",0x98,"std",0xFD,"clc",0xF8,"stc",0xF9,"32b",0x66,
+  "pushf",0x9C,"pusha",0x60,"popf",0x9D,"popa",0x61,".es",0x26,"aaa",0x37,"aas",0x3F,
+  "cli",0xFA,"sti",0xFB,"rep",0xF3,"repc",0x65,"repz",0xF3,"lahf",0x9F,
+  "sahf",0x9E,"hlt",0xF4,"repe",0xF3,"repne",0xF2,"repnz",0xF2,"repnc",0x64,
+  "cmpsb",0xA6,"cmpsw",0xA7,"movsb",0xA4,"movsw",0xA5,"ret",0xC3,"retf",0xCB,
+  "iret",0xCF,".cs",0x2E
+};
+
+
+
+#define bin_n 7
+
+struct binary_opcode
+{
+ char name [4];
+ unsigned char code;
+};
+
+struct binary_opcode bin_opcode [bin_n+1] = { "shr",0xE8,"shl",0xE0,
+					      "rcl",0xD0,"rcr",0xD8,
+					      "rol",0xC0,"ror",0xC8,
+					      "sal",0xE0,"sar",0xF8 };
+
+#define l1_n 16
+
+struct ar_opcode
+{
+ char name [5];
+ char noperand;
+ unsigned char actual_code;
+ unsigned char op1;
+ unsigned char op2;
+ unsigned char op3;
+ unsigned char op4;
+};
+
+
+struct ar_opcode l1_opcode [l1_n+1] = { {"adc",2,0x10,0x80,0x11,0x12,0x83} ,
+					{"add",2,0x00,0x80,0x01,0x02,0x83} ,
+					{"and",2,0x20,0x80,0x21,0x22,0x83} ,
+					{"cmp",2,0x38,0x80,0x39,0x3a,0x83} ,
+					{"or" ,2,0x08,0x80,0x09,0x0a,0x83} ,
+					{"sbb",2,0x18,0x80,0x19,0x1a,0x83} ,
+					{"sub",2,0x28,0x80,0x29,0x2a,0x83} ,
+					{"xor",2,0x30,0x80,0x31,0x32,0x83} ,
+					{"xchg",2,0x86,0x0,0x87,0x86,0x0} ,
+					{"dec",1,0x08,0xFE,0x00,0x00,0x00} ,
+					{"div",1,0x30,0xF6,0x00,0x00,0x00} ,
+					{"idiv",1,0x38,0xF6,0x00,0x00,0x00} ,
+					{"imul",1,0x28,0xF6,0x00,0x00,0x00},
+					{"mul",1,0x20,0xF6,0x00,0x00,0x00} ,
+					{"neg",1,0x18,0xF6,0x00,0x00,0x00} ,
+					{"not",1,0x10,0xF6,0x00,0x00,0x00} ,
+					{"inc",1,0x0,0xFE,0x00,0x00,0x00},
+				      };
+
+
+int i_label = 0;
+
+void error (char* e)
+{
+puts ("\n\r**error** ("); putn (ligne); puts (") "); puts (e);
+}
+
+unsigned long s2c_dec (char* st)
+{
+ int i;
+ int base = 10;
+ unsigned long num=0;
+ int n;
+ i = 0;
+ if (st[0] == '$') { base = 16 ; i++; }
+ if (st[0] == '%') { base = 10 ; i++; }
+ if (st[0] == '#') { base = 2 ; i++; }
+ if (st[0] == '\'') return st[1];
+
+ for (; st[i] != 0; i++) {
+			       if (base == 10)
+				if ( (st[i]<48) || (st[i]>(48+9)) )
+				 { error ("invalid number notation"); return 0; }
+				n = st[i]-48;
+				if ( (base == 16) && (st[i] >= 'a') && ( st[i] <= 'f')) n = st[i]-'a'+10;
+
+
+				num = (num * base) + n;
+			 }
+ return num;
+}
+
+void lower_case (char* str)
+{
+ int i;
+ for (i=0; str[i] != 0; i++)
+ {
+ if ( str[i] == '\'') i += 2;
+ if ( (str[i] > 64) && (str[i] < 91)) str[i] += 'a' - 'A';
+ }
+}
+
+uint get_ofs_label (char* lab)
+{
+ int i;
+ for (i=0; i <= 49 ; i++)
+  if ( label [i][0] != 0)
+   if (!strcmp (lab,label[i])) return lab_ofs[i];
+return 0;
+}
+
+int is_label (char* lab)
+{
+ int i;
+
+ for (i=0; i <= 30 ; i++)
+  if ( label [i][0] != 0)
+    if (!strcmp (lab,label[i])) return 1;
+return 0;
+}
+
+void record_label (char* lab)
+{
+ int i;
+ if (strlen (lab) > 20) { error ("too much caracters label");return;}
+ if (is_label (lab)==1) { error ("label already used"); return; }
+ for (i=0;i <= 50; i++)
+  if ( label[i][0] == 0) { strcpy (label[i],lab);
+			   lab_ofs [i] = ofs;
+			   return ;}
+ error ("label overflow ( > 50 )");
+}
+
+int x;
+
+void waiting_label (char* lab, uchar cod)
+{
+ int i;
+ for (i=0; i <= 50 ; i++)
+  if ( wlabel[i][0] == 0) {
+	for (x=0;x<=19;x++) wlabel[i][x] = 0;
+	strcpy (wlabel[i],lab); wlab_ofs[i] = ofs;
+	wlab_cod [i] = cod;
+	return;
+  }
+ error ("too many label");
+}
+
+int argc;
+int old_ofs;
+int ac_size =0;
+int ac_ea;
+
+char s [100];
+
+int gi; 
+
+int assemble (char*    line)
+{
+ argc = strlen ( get_argz (line,1) )-1;
+ old_ofs = ofs;
+
+
+  if (!strcmp ((string)get_argz (line,1),".string")) {
+						     for (x=1;(get_argz(line,2))[x]!='\"';x++)
+						      if ((char)(get_argz(line,2)[x] == 0)) binary [ofs++] = 32;
+						      else binary [ofs++] = (char)(get_argz(line,2)[x]);
+						      old_ofs=!ofs;
+						     }
+ get_argz (line,1)[strlen(get_argz (line,1))] = 32;
+ lower_case (line);
+
+ if ( get_argz(line,1) [argc] == ':')
+ {
+  old_ofs = !ofs;
+  get_argz(line,1) [argc] = 0;
+  record_label (get_argz(line,1));
+  for (argc=0; argc <= 49; argc++)
+   if ( wlabel[argc][0] != 0 )
+    if ( !strcmp (wlabel[argc],get_argz(line,1)))
+    {
+     wlabel [argc][0] = 0;
+     binary [wlab_ofs[argc]] = wlab_cod[argc];
+     if (  (wlab_cod [argc] == 0xE9)
+	 ||(wlab_cod [argc] == 0xE8) )
+	   {
+	    binary [wlab_ofs[argc]+1] = (char)(( ofs-(wlab_ofs[argc])) & 0x00ff )-3;
+	    binary [wlab_ofs[argc]+2] = (char)(( ofs-(wlab_ofs[argc])) >> 8 );
+	   }
+    else binary [wlab_ofs[argc]+1] = (char)( ofs-(wlab_ofs[argc]))-2;
+    }
+
+ }
+
+ if (!strcmp ((string)get_argz (line,1),"\n")) old_ofs = !ofs;
+ if (!strcmp ((string)get_argz (line,1),"")) old_ofs = !ofs;
+ if (!strcmp ((string)get_argz (line,1),"jmp"))
+ {
+  if (is_label (get_argz (line,2)))
+   {
+    if ( (ofs-get_ofs_label (get_argz (line,2))) > 255)
+    {
+     binary [ofs++] = 0xE9;
+     binary [ofs++] = (char)((get_ofs_label (get_argz (line,2))-ofs-2) & 0x00ff);
+     binary [ofs++] = (char)((get_ofs_label (get_argz (line,2))-ofs-3) >> 8);
+    }
+    else
+    {
+     binary [ofs++] = 0xEB;
+     binary [ofs++] = ((char)(get_ofs_label (get_argz (line,2))-ofs)-1);
+    }
+   }
+  else { waiting_label (get_argz(line,2),0xE9); ofs += 3;}
+ }
+
+  if ( (get_argz (line,1)[0] == 'j') || (get_argz (line,1)[0] == 'l'))
+  {
+   for (x=0;x<jcc_n;x++)
+    if (!strcmp (jcc[x],get_argz(line,1)))
+    {
+     if (is_label (get_argz (line,2)))
+     {
+      binary [ofs++] = jcc_code [x];
+      binary [ofs++] = (char)((get_ofs_label (get_argz (line,2))-ofs-1));
+     }
+     else { waiting_label (get_argz(line,2),jcc_code[x]); ofs += 2;}
+    }
+  }
+
+  if (!strcmp ((string)get_argz (line,1),"call"))
+ {
+  if (is_label (get_argz (line,2)))
+   {
+     binary [ofs++] = 0xE8;
+     binary [ofs++] = (char)((get_ofs_label (get_argz (line,2))-ofs-2) & 0x00ff);
+     binary [ofs++] = (char)((get_ofs_label (get_argz (line,2))-ofs-3) >> 8);
+   }
+  else { waiting_label (get_argz(line,2),0xE8); ofs += 3;}
+ }
+
+ for (xx=0;xx<=once_opcode_n;xx++)
+ {
+  if (  (!strcmp ((string)get_argz (line,1),once_opcode[xx].name))
+      ||(!strcmp ((string)get_argz (line,2),once_opcode[xx].name)) )
+  binary [ofs++] = once_opcode[xx].code;
+ }
+
+ if (!strcmp ((string)get_argz (line,1),"aad")) { binary [ofs++] = 0xD5; binary [ofs++] = 0x0A; }
+ if (!strcmp ((string)get_argz (line,1),"aam")) { binary [ofs++] = 0xD4; binary [ofs++] = 0x0A; }
+
+ if (!strcmp ((string)get_argz (line,1),"pop"))
+ {
+
+  for (gi=0;gi<=3;gi++)
+  {
+   if (!strcmp ((string)get_argz (line,2),sreg[gi])) binary [ofs++] = 0x07 + (gi*8);
+  }
+
+  if (ofs==old_ofs) binary [ofs++] = 0x8f;
+
+  for (gi=0;gi<=7;gi++)
+  {
+   if (!strcmp ((string)get_argz(line,2),reg16[gi])) binary [ofs++] = 0xC0 + gi;
+  }
+
+  if (binary [ofs-1] == 0x8f) { error ("incorrect 'pop' usage"); return 1;}
+ }
+
+ if (!strcmp ((string)get_argz (line,1),"push"))
+ {
+  for (gi=0;gi<=3;gi++)
+  {
+   if (!strcmp ((string)get_argz (line,2),sreg[gi])) binary [ofs++] = 0x06 + (gi*8);
+  }
+
+  if (ofs==old_ofs) binary [ofs++] = 0xff;
+
+  for (gi=0;gi<=7;gi++)
+  {
+   if (!strcmp ((string)get_argz (line,2),reg16[gi])) binary [ofs++] = 0xF0 + gi;
+  }
+
+  if (binary [ofs-1] == 0xff) { error ("incorrect 'push' usage"); return 1;}
+ }
+
+ if (!strcmp ((string)get_argz (line,1),"out"))
+ {
+  if (!strcmp ((string)get_argz(line,3),reg8[0]))
+  {
+   if (!strcmp ((string)get_argz(line,2),reg16[2])) binary [ofs++] = 0xEE;
+    else {
+	  binary [ofs++] =0xE6;
+	  if (s2c_dec(get_argz(line,2)) > 255) {error ("must 8-bits value"); return 1;}
+	  binary [ofs++] = (uchar)s2c_dec(get_argz(line,2));
+	 }
+  }
+  if (!strcmp ((string)get_argz(line,3),reg16[0]))
+  {
+   if (!strcmp ((string)get_argz(line,2),reg16[2])) binary [ofs++] = 0xEF;
+    else  {
+	   binary [ofs++] =0xE7;
+	   if (s2c_dec(get_argz(line,2)) > 255) {error ("must 8-bits value"); return 1;}
+	   binary [ofs++] = (uchar)(s2c_dec(get_argz(line,2)));
+	  }
+  }
+ }
+
+ if (!strcmp ((string)get_argz (line,1),"in"))
+ {
+  if (!strcmp ((string)get_argz(line,2),reg8[0]))
+  {
+   if (!strcmp ((string)get_argz(line,3),reg16[2])) binary [ofs++] = 0xEC;
+    else {
+	  binary [ofs++] =0xE4;
+	  if (s2c_dec(get_argz(line,3)) > 255) {error ("must 8-bits value"); return 1;}
+	  binary [ofs++] = (uchar)s2c_dec(get_argz(line,3));
+	 }
+  }
+  if (!strcmp ((string)get_argz(line,2),reg16[0]))
+  {
+   if (!strcmp ((string)get_argz(line,3),reg16[2])) binary [ofs++] = 0xED;
+    else  {
+	   binary [ofs++] =0xE5;
+	   if (s2c_dec(get_argz(line,3)) > 255) {error ("must 8-bits value"); return 1;}
+	   binary [ofs++] = (uchar)(s2c_dec(get_argz(line,3)));
+	  }
+  }
+ }
+
+ if (!strcmp ((string)get_argz (line,1),".org")) {
+						  ofs = s2c_dec (get_argz (line,2)) ;
+						 }
+ if (!strcmp ((string)get_argz (line,1),".byte")) binary [ofs++] = (uchar)s2c_dec (get_argz (line,2)) ;
+ if (!strcmp ((string)get_argz (line,1),".word")) {
+							binary [ofs++] = (uchar) (s2c_dec ((get_argz (line,2))) & 0x00ff);
+							binary [ofs++] = (uchar) (s2c_dec ((get_argz (line,2))) >> 8) ;
+						  }
+ if (!strcmp ((string)get_argz (line,1),".array")) {
+						     x = s2c_dec (get_argz(line,2));
+						     ac_ea = s2c_dec (get_argz(line,3));
+						     for (;x!=0;x--) binary[ofs++] = ac_ea;
+						  }
+
+
+ if ( get_argz (line,1)[0] == ';') old_ofs = !ofs;
+
+ if (!strcmp ((string)get_argz (line,1),"int"))
+ {
+  binary [ofs++] = 0xCD;
+  binary [ofs++] = (uchar)s2c_dec (get_argz (line,2)) ;
+ }
+
+
+ for (xx=0;xx<=bin_n;xx++)
+ {
+  if (!strcmp ((string)get_argz (line,1),bin_opcode[xx].name))
+  {
+   ea = 8; op_size = 8;
+
+   for (gi=0;gi<=7;gi++)
+   {
+    if (!strcmp ((string)get_argz (line,2),reg8[gi])) ea = gi;
+   }
+   if (ea==8) op_size =16;
+   for (gi=0;gi<=7;gi++)
+   {
+    if (!strcmp ((string)get_argz (line,2),reg16[gi])) ea = gi;
+   }
+
+   if (ea==8) { error ("incorrect right operan"); return 1;}
+   if (!strcmp ((string)get_argz (line,3),"cl"))
+   {
+    if (op_size==8) binary [ofs++] = 0xD2;
+    else binary [ofs++] = 0xD3;
+    binary [ofs++] = bin_opcode[xx].code + ea;
+   }
+   else
+   {
+     if (s2c_dec (get_argz(line,3)) > 255)
+     { error ("must be 8-bit value"); return 1; }
+    if (op_size==8) binary [ofs++] = 0xC0;
+    if (op_size==16) binary [ofs++] = 0xC1;
+    binary [ofs++] = bin_opcode [xx].code + ea;
+    binary [ofs++] = s2c_dec (get_argz(line,3));
+   }
+  }
+ }
+
+ for (xx=0;xx<=l1_n;xx++)
+{
+ if (   (!strcmp ((string)get_argz (line,1),"mov"))
+     || (!strcmp ((string)get_argz (line,1),l1_opcode[xx].name)) )
+  {
+   op = 0;
+
+   if (strcmp ((string)get_argz (line,1),"mov")) op = 1;
+
+   binary [ofs] = 0xb0; op_size = 8; ea = 8 ; argc = 2;
+
+   if (!strcmp ((string)get_argz (line,2),"byte"))
+    {
+     if (strcmp ((string)get_argz (line,3),"ptr")) { error ("missing 'ptr'"); return 1;}
+     binary [ofs++] = 0xC6; argc = 3;
+
+     if (op) {
+	       binary [ofs-1] = l1_opcode[xx].op1;
+	       actual_code = l1_opcode[xx].actual_code;
+	     }
+     else actual_code = 0;
+
+     if      (!strcmp ((string)get_argz (line,4),ofs_bx)) binary [ofs++] = 7 + actual_code;
+     else if (!strcmp ((string)get_argz (line,4),ofs_si)) binary [ofs++] = 4 + actual_code;
+     else if (!strcmp ((string)get_argz (line,4),ofs_di)) binary [ofs++] = 5 + actual_code;
+     else if (is_label (get_argz (line,4)) != 0)
+	    {
+	     binary [ofs++] = 6 + actual_code;
+	     binary [ofs++] = get_ofs_label (get_argz (line,4)) & 0x00ff;
+	     binary [ofs++] = get_ofs_label (get_argz (line,4)) >> 8;
+	    }
+     else { error ("incorrect effective address"); return 1 ; }
+     if ( (op) && (l1_opcode[xx].noperand == 1)) ;
+     else binary [ofs++] = (uchar)s2c_dec (get_argz (line,5)) ;
+     return 0;
+    }
+
+    if (!strcmp ((string)get_argz (line,2),"word"))
+    {
+     if (strcmp ((string)get_argz (line,3),"ptr")) { error ("missing 'ptr'"); return 1;}
+     binary [ofs++] = 0xC7; argc = 3;
+     if (op) {
+		binary [ofs-1] = l1_opcode[xx].op1+1;
+		actual_code = l1_opcode[xx].actual_code;
+	     }
+     else actual_code = 0;
+
+     if      (!strcmp ((string)get_argz (line,4),ofs_bx)) binary [ofs++] = 7 + actual_code;
+     else if (!strcmp ((string)get_argz (line,4),ofs_si)) binary [ofs++] = 4 + actual_code;
+     else if (!strcmp ((string)get_argz (line,4),ofs_di)) binary [ofs++] = 5 + actual_code;
+     else if (is_label (get_argz (line,4)) != 0)
+	    {
+	     binary [ofs++] = 6 + actual_code;
+	     binary [ofs++] = get_ofs_label (get_argz (line,4)) & 0x00ff;
+	     binary [ofs++] = get_ofs_label (get_argz (line,4)) >> 8;
+	    }
+     else { error ("incorrect effective address"); return 1 ; }
+     if ( (op) && (l1_opcode[xx].noperand == 1)) ;
+     else {
+	    binary [ofs++] = (uchar) (s2c_dec (get_argz (line,5)) & 0x00ff);
+	    binary [ofs++] = (uchar) (s2c_dec (get_argz (line,5)) >> 8);
+	  }
+     return 0;
+    }
+
+   if (!strcmp ((string)get_argz (line,2),ofs_bx))
+   {
+    binary[ofs++] = 0x89; binary [ofs] = 7; argc =3;
+    if (op) binary [ofs-1] = l1_opcode[xx].op2;
+   }
+   if (!strcmp ((string)get_argz (line,2),ofs_si))
+   {
+    binary[ofs++] = 0x89; binary [ofs] = 4; argc =3;
+    if (op) binary [ofs-1] = l1_opcode[xx].op2;
+   }
+   if (!strcmp ((string)get_argz (line,2),ofs_di))
+   {
+    binary[ofs++] = 0x89; binary [ofs] = 5; argc =3;
+    if (op) binary [ofs-1] = l1_opcode[xx].op2;
+   }
+
+   for (gi=0;gi<=7;gi++)
+   {
+    if (!strcmp ((string)get_argz (line,argc),reg8[gi])) ea = gi;
+   }
+
+   if (binary[ofs-1] != 0x89)
+    if (binary[ofs-1] != 0x39)
+     if (ea == 8 ) { binary [ofs] = 0xb8; op_size = 16; }
+   if (ea==8) op_size = 16;
+
+   for (gi=0;gi<=7;gi++)
+   {
+    if (!strcmp ((string)get_argz (line,argc),reg16[gi])) ea = gi;
+   }
+
+   if (!strcmp ((string)get_argz (line,argc),"ds")) { ea = !ea;binary[ofs++] = 0x8E; binary [ofs] = 0xD8;}
+   if (!strcmp ((string)get_argz (line,argc),"es")) { ea = !ea;binary[ofs++] = 0x8E; binary [ofs] = 0xC0;}
+   ac_ea = ea;
+
+   if (ea == 8) { error ("incorrect left-operand."); return 1; }
+
+   if (binary[ofs-1] == 0x89) { if (op_size==8) binary [ofs-1]--;binary [ofs++] += (ea*8); return 0;}
+   if (binary[ofs-1] == 0x39) { if (op_size==8) binary [ofs-1]--;binary [ofs++] += (ea*8); return 0;}
+   argc = 3;
+   ac_size = op_size; ea = 8;
+
+   for (gi=0;gi<=7;gi++)
+   {
+    if (!strcmp ((string)get_argz (line,argc),reg8[gi])) ea = gi;
+   }
+
+   if (ea == 8 ) op_size = 16;
+
+   for (gi=0;gi<=7;gi++)
+   {
+    if (!strcmp ((string)get_argz (line,argc),reg16[gi])) ea = gi;
+   }
+
+   for (gi=0;gi<=3;gi++)
+   {
+    if (!strcmp ((string)get_argz (line,argc),sreg[gi]))
+    {
+     binary [ofs++] = 0x8c;
+     binary [ofs++] = ac_ea + (0xC0 + (8*gi));
+    }
+   }
+
+   if (binary[ofs-1] == 0x8E) { binary [ofs++] += ea; return 0;};
+
+   if ( (op) && (l1_opcode[xx].noperand ==1) )
+   {
+    if (ac_size==8) binary[ofs++] = l1_opcode[xx].op1;
+    if (ac_size==16) binary[ofs++] = l1_opcode[xx].op1+1;
+    binary[ofs++] = 0xc0+l1_opcode[xx].actual_code+ac_ea;
+    return 0;
+   }
+
+   if (   ( (get_argz (line,3) [0] > 47) && (get_argz (line,3) [0] < (48+10)) )
+       || (get_argz (line,3) [0] == '\'')
+       || (get_argz (line,3) [0] == '$')
+       || (get_argz (line,3) [0] == '%')
+       || (get_argz (line,3) [0] == '#') )
+    {
+     binary [ofs++] += ac_ea;
+     if ((op) && (ac_size ==8)) {binary [ofs-1] = l1_opcode[xx].op1; binary [ofs++] = l1_opcode[xx].actual_code+0xc0 + ac_ea; }
+     if ((op) && (ac_size ==16)) {binary [ofs-1] = l1_opcode[xx].op1+1; binary [ofs++] = l1_opcode[xx].actual_code+0xc0 + ac_ea; }
+
+
+     if ( ac_size == 8 )
+      if (s2c_dec (get_argz(line,3)) > 255) { error ("must be 8-bits value"); return 1;}
+      else binary [ofs++] = (uchar)s2c_dec (get_argz (line,3)) ;
+     if ( ac_size == 16) { binary [ofs++] = (uchar) (s2c_dec (get_argz (line,3)) & 0x00ff);
+			   binary [ofs++] = (uchar) (s2c_dec (get_argz (line,3)) >> 8);
+			 }
+    }
+
+   else if  (ea != 8) {
+		 if ( (op_size == 8) && (op==0)) binary [ofs++] = 0x8a;
+		 if ( (op_size ==16) && (op==0)) binary [ofs++] = 0x8b;
+		 if ( (op_size == 8) && (op)) binary [ofs++] = l1_opcode[xx].op3;
+		 if ( (op_size ==16) && (op)) binary [ofs++] = l1_opcode[xx].op3+1;
+		 if (ac_size != op_size) { error ("different size registers"); return 1;}
+		 //if (op_size == 8) binary [ofs]--;
+		 binary [ofs++] =  (0xC0) + (ac_ea * 8) + ea;
+		}
+
+   else if ( get_argz (line,3) [0] == '[' )
+    {
+
+     if ((op_size == 8) && (op==0)) binary [ofs++] = 0x8a;
+     if ((op_size == 16)&& (op==0)) binary [ofs++] = 0x8b;
+
+     if ((op_size == 8) && (op) ) binary [ofs++] = l1_opcode[xx].op3;
+     if ((op_size ==16) && (op) ) binary [ofs++] = l1_opcode[xx].op3+1;
+
+
+     if       (!strcmp ((string)get_argz (line,3),ofs_bx)) binary [ofs++] = 7 + (ac_ea*8);
+     else if (!strcmp ((string)get_argz (line,3),ofs_si)) binary [ofs++] = 4 + (ac_ea*8);
+     else if (!strcmp ((string)get_argz (line,3),ofs_di)) binary [ofs++] = 5 + (ac_ea*8);
+     else { error ("effective address incorrect"); return 1; }
+    }
+   else if (!strcmp ((string)get_argz (line,3),"offset"))
+     {
+	     binary [ofs++] += ac_ea;
+	     if (!is_label (get_argz(line,4))) { error ("unknown variable"); return 1;};
+	     binary [ofs++] = get_ofs_label (get_argz (line,4)) & 0x00ff;
+	     binary [ofs++] = get_ofs_label (get_argz (line,4)) >> 8;
+     }
+   else if (is_label (get_argz (line,3)) != 0)
+	    {
+	     if (op_size == 8) binary [ofs++] = 0x8a;
+	     if (op_size == 16) binary [ofs++] = 0x8b;
+	     binary [ofs++] = 6 + (ac_ea*8);
+	     binary [ofs++] = get_ofs_label (get_argz (line,3)) & 0x00ff;
+	     binary [ofs++] = get_ofs_label (get_argz (line,3)) >> 8;
+	    }
+   else if ( (op) && (l1_opcode[xx].noperand == 1)) ;
+   else { error ("incorrect right-operand."); return 1;}
+  return 0;
+  }
+}
+ if (old_ofs == ofs) { error ("Illegal instruction");return 1; }
+ return 0;
+}
+
+char* prog_name (char* s)
+{
+int i;
+for (i=0; (s[i]!=0) && (s[i]!='.');i++);
+s[i] = 0;
+return s;
+}
+
+handle input;
+handle output;
+int err = 0;
+char argv [20];
+
+ #ifdef FOR_DREAMOS
+void start_program ()
+{
+
+ memcpy ((uint)_CS,(uint)argv,_ES,_BX,19);
+ puts ("\n\r");
+ puts (get_argz(argv,2));putc (':');
+ binary = (addr)(malloc (40000>>4));
+ asm {	shl dword ptr binary,16 }
+ input = fopen (get_argz(argv,2));
+ if (input < 2) { puts ("input file incorrect."); free (40000>>4); return ; }
+ bufferbatch = malloc (0xfff);
+ fread (input,fsize(input),0,bufferbatch);
+ output = fcreate (prog_name(get_argz(argv,2)));
+ if (output < 2) { puts ("can't create output"); free (0xfff);return ; }
+ setattr (output,0xc);
+ #endif
+
+ #ifndef FOR_DREAMOS
+void start_program (char* arg1,char* arg2)
+{
+
+ input = fopen (arg1,"rb");
+ output = fopen (arg2,"wb");
+ binary = (unsigned char*)malloc (40000);
+ #endif
+
+
+ for (argc=0; argc <= 49 ; argc++)
+  for (err=0; err <= 19 ; err++)
+   label[err][argc] = 0;
+
+ err = 0;
+ while ( fgets (s,100,input) != NULL )
+ {
+  #ifndef FOR_DREAMOS
+   s[strlen (s)-2]  = 0;
+  #endif
+  ligne++;
+  if (s[0] == 0) continue;
+
+
+  if (assemble (s)) { err = 1 ; break; }
+ }
+
+ for (x=0;x<=49;x++)
+  if ( wlabel[x][0] != 0) { error ("no label found for "); puts (wlabel[x]);}
+
+ if (!err) puts (" completed.");
+
+ #ifdef FOR_DREAMOS
+ asm {	shr dword ptr binary,16 }
+ if (!err) fwrite (output,ofs,0,(uint)binary);
+ if (err) fremove (output);
+ #endif
+
+ #ifndef FOR_DREAMOS
+ if (!err) fwrite (binary,ofs,1,output);
+  fclose (input);
+  fclose (output);
+ #endif
+
+ #ifdef FOR_DREAMOS
+ free (40000>>4);
+ free (0xfff);
+ #endif
+ #ifndef FOR_DREAMOS
+ free (binary);
+ #endif
+
+}
+

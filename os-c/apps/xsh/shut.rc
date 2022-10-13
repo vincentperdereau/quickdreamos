@@ -1,0 +1,8 @@
+Halt System
+Reboot
+Halt QWin
+!
+&halt
+&reboot
+&quit
+

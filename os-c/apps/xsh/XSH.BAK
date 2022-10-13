@@ -1,0 +1,2625 @@
+#include "startup.h"
+#include "string.h"
+void showmouse (void);
+void hidemouse (void);
+void TickMenu (void);
+void MessageBox (char*);
+void FullScreenShell (void);
+void CommandTerm (char*,char);
+void About (void);
+unsigned int bmouse (void);
+
+int isFont=0;
+int backc;
+unsigned char gmode = 1;
+unsigned int font_mem;
+static char TempString [50];
+
+#include "file.h"
+#include "graph.h"
+#include "himem.h"
+#include "scroll.h"
+#include "memory.h"
+#include "xmem.h"
+
+#include "shell.h"
+
+unsigned int malloc (int pg)
+{
+ asm {
+       mov ah,0x12
+       mov bx,pg
+       int 0x44
+     } 
+}
+
+void free (unsigned int segm)
+{
+  asm {
+	mov ah,0x13
+	mov bx,segm
+	int 0x44
+      }
+}
+
+unsigned int avail (void)
+{
+ asm {
+       mov ah,0x15
+       int 0x44
+      } 
+}
+
+char is_alt (void)
+{
+ asm {
+	mov ah,2
+	int 0x16
+	and al,8
+	shr al,3
+     }
+}
+
+unsigned char is_key (void)
+{
+ asm {
+	mov ah,1
+	xor bl,bl
+	int 0x16
+	setz bl
+	mov al,bl
+	xor al,1
+      }
+}
+
+char getch (void)
+{
+  asm {
+       mov ah,0x0
+       int 0x16
+       mov al,ah
+     };
+}
+
+unsigned int Xgetch (void)
+{
+  asm {
+       mov ah,18h
+       int 44h
+
+     };
+}
+
+unsigned int PosString (char far* parser, unsigned int pos)
+{
+ unsigned int j,k;
+
+ j = 0; k = 0;
+ while ( j != pos)
+ {
+  if (parser [k++] == 0) j++;
+ }
+ return k;
+}
+
+
+static int mx,my,mb;
+static int oldx = 320 ,oldy = 240;
+static unsigned char cursor [28][3] = {
+{0,0,0} ,
+{0,1,0} , {1,1,0} ,
+{0,2,0} , {1,2,15} , {2,2,0} ,
+{0,3,0} , {1,3,15} , {2,3,15} , {3,3,0} ,
+{0,4,0} , {1,4,15} , {2,4,15} , {3,4,15} , {4,4,0},
+{0,5,0} , {1,5,15} , {2,5,15} , {3,5,15} , {4,5,15} , {5,5,0} ,
+{0,6,0} , {1,6,0} ,  {2,6,0} ,  {3,6,0} ,  {4,6,0} ,  {5,6,0} , {6,6,0}
+} ;
+
+static unsigned char swap [28];
+static int i;
+static flag=0;
+static char k,by,kb,byb;
+static mouse_status = 0;
+
+unsigned char Pal [6];
+
+#define CONTROL_TYPE_BUTTON  0x01
+#define CONTROL_TYPE_EDITBOX 0x02
+#define CONTROL_TYPE_TXTAREA 0x03
+#define CONTROL_TYPE_CYCLER  0x04
+#define CONTROL_EXEC         0xC0
+#define CONTROL_BUTTON       0xC1
+#define WINDOW_DESTROY       0xB0
+
+
+
+struct hControl
+{
+ unsigned int x,y,w,h;
+ unsigned char ControlType;
+ unsigned char ControlID;
+ unsigned int StrSegment;
+ unsigned int StrOffset;
+ void far* prev;
+ unsigned int size;
+ unsigned int word1;
+ unsigned int word2;
+ unsigned int word3;
+
+
+};
+
+typedef struct hControl far* CONTROL;
+
+struct hWindow
+{
+ unsigned int x,y,w,h;
+ unsigned long form;
+ void far* prev;
+ void far (*WinMain)(void);
+ void far* FirstControl;
+ void far* LastControl;
+ void far* ActiveControl;
+};
+
+typedef struct hWindow far* HWND;
+
+struct SystemBuffer {
+unsigned char function;
+unsigned char byte1;
+unsigned char byte2;
+unsigned int word1;
+unsigned int word2;
+unsigned int word3;
+unsigned int word4;
+unsigned int word5;
+unsigned int word6;
+unsigned long dword1;
+unsigned int word7;
+} ;
+
+typedef struct SystemBuffer SB;
+
+SB SysBuf;
+
+static HWND topWnd=0;
+static HWND protectedWnd=0;
+
+CONTROL FindLastEditBox (HWND fhWnd);
+CONTROL FindLastButton (HWND fhWnd);
+
+CONTROL activeEditBox;
+CONTROL activeButton;
+
+static CONTROL dumControl;
+static CONTROL tempControl;
+
+
+unsigned long save_area (int x, int y, int w, int h)
+{
+ unsigned int ret;
+ unsigned long xadr;
+
+ ret = malloc ( (imagesize (x,y,x+w,y+h) >> 4) + 1 );
+ getimage (x,y,x+w,y+h,ret);
+
+ xadr = HiMemoryAlloc ( imagesize (x,y,x+w,y+h) );
+
+ himem_write (ret,0,xadr,imagesize (x,y,x+w,y+h) );
+ free (ret);
+ //ret = xadr;
+
+ return xadr;
+}
+
+void restore_area (int x, int y, int w,int h,unsigned long ret,char rel)
+{
+ unsigned int basemem;
+
+ basemem = malloc ( (imagesize (x,y,x+w,y+h) >> 4) + 1 );
+ himem_read (ret,basemem,0,imagesize (x,y,x+w,y+h));
+ putimage (x,y,basemem);
+ free (basemem);
+ if (rel) HiMemoryFree (ret);
+}
+
+static unsigned char is_full_app;
+
+
+unsigned long screen_seg1, screen_seg2, screen_seg3,
+	      screen_seg4, screen_seg5;
+
+void InitFullApp (void)
+{
+ hidemouse ();
+ if (gmode == 1)
+ {
+  screen_seg1 = save_area (0,0  ,640,96);
+  screen_seg2 = save_area (0,96 ,640,96);
+  screen_seg3 = save_area (0,192,640,96);
+  screen_seg4 = save_area (0,288,640,96);
+  screen_seg5 = save_area (0,384,640,96);
+ }
+ else
+ {
+  screen_seg1 = save_area (0,0  ,800,120);
+  screen_seg2 = save_area (0,120,800,120);
+  screen_seg3 = save_area (0,240,800,120);
+  screen_seg4 = save_area (0,360,800,120);
+  screen_seg5 = save_area (0,480,800,120);
+ 
+ }
+ 
+ showmouse ();
+ is_full_app = 1;
+}
+
+void CloseFullApp (void)
+{
+ hidemouse ();
+ if (gmode == 1)
+ {
+ restore_area (0,0  ,640,96,screen_seg1,1);
+ restore_area (0,96 ,640,96,screen_seg2,1);
+ restore_area (0,192,640,96,screen_seg3,1);
+ restore_area (0,288,640,96,screen_seg4,1);
+ restore_area (0,384,640,96,screen_seg5,1);
+ }
+ else
+ {
+ restore_area (0,0  ,800,120,screen_seg1,1);
+ restore_area (0,120,800,120,screen_seg2,1);
+ restore_area (0,240,800,120,screen_seg3,1);
+ restore_area (0,360,800,120,screen_seg4,1);
+ restore_area (0,480,800,120,screen_seg5,1);
+}
+ showmouse ();
+ is_full_app = 0;
+}
+
+static HWND dumWnd;
+
+static char TempString2 [50] = {0,};
+
+HWND CreateWindow (int x, int y, int w, int h, char color, char* title)
+{
+ // CONTROL LastEditBox;
+
+ hidemouse ();
+
+ // LastEditBox = activeEditBox; //FindLastEditBox (topWnd);
+  if (activeEditBox != (CONTROL)0 )
+  {
+   SetColor (15);
+   memcpy (_CS,(unsigned int)TempString2,activeEditBox->StrSegment,activeEditBox->StrOffset,49);
+   Line (activeEditBox->x+(Xstrlen(TempString2)*8)+5,
+	activeEditBox->y+5,
+	activeEditBox->x+(Xstrlen(TempString2)*8)+5,
+	activeEditBox->y+16);
+  }
+
+ SetColor (0);
+
+ x = (( (x >> 3) + 1) << 3);
+ w = (( (w >> 3) + 1) << 3);
+
+ if ( is_full_app == 0 )
+ {
+  if ( topWnd != 0 )
+   topWnd->form = save_area (topWnd->x,topWnd->y,topWnd->w-8,topWnd->h);
+ }
+
+  dumWnd = (unsigned long) malloc (2);
+  asm { shl dword ptr dumWnd,16 };
+ 
+ dumWnd->x = x;
+ dumWnd->y = y;
+ dumWnd->w = w;
+ dumWnd->h = h;
+ dumWnd->form = 0;
+ dumWnd->WinMain = 0;
+ Window (x,y,w,h,color,title);
+ dumWnd->prev = (void far*)topWnd;
+ dumWnd->FirstControl = (void far*)0;
+ dumWnd->ActiveControl = (void far*)0;
+ topWnd = dumWnd;
+
+ showmouse ();
+
+ activeButton = (CONTROL)0;
+ activeEditBox = (CONTROL)0;
+
+ return dumWnd;
+}
+
+HWND NextWindow (HWND Wnd)
+{
+ HWND tempWnd;
+
+ if (Wnd == topWnd) return topWnd;
+
+ tempWnd = topWnd;
+
+ while (tempWnd->prev != Wnd)
+ {
+  tempWnd = tempWnd->prev;
+//  if (tempWnd = (HWND)0) return (HWND)0;
+ }
+ return tempWnd;
+}
+
+void DestroyControl (HWND dmWnd)
+{
+ unsigned int dc;
+
+ dumControl = dmWnd->LastControl;
+ while (1)
+ {
+  tempControl = dumControl->prev;
+
+  dc = (unsigned int) ( (unsigned long)(dumControl) >> 16 );
+  free (dc);
+
+  if (dumControl == dmWnd->FirstControl) break;
+  dumControl = tempControl;
+ }
+}
+
+void DestroyWindow (HWND dmWnd)
+{
+ HWND tempWnd;
+// CONTROL tempControl;
+ unsigned int dm;
+
+ if (dmWnd != topWnd) return;
+
+ hidemouse ();
+ SetColor (backc);
+ waitretrace ();
+ if ( is_full_app == 0 )
+ {
+ 
+  fastbar (dmWnd->x,dmWnd->y,dmWnd->w+dmWnd->x,dmWnd->h+dmWnd->y);
+  tempWnd = NextWindow ((HWND)0);
+
+  while (tempWnd != dmWnd)
+  {
+   waitretrace ();
+//   putimage (tempWnd->x,tempWnd->y,tempWnd->form);
+   restore_area (tempWnd->x,tempWnd->y,tempWnd->w-8,tempWnd->h,tempWnd->form,0);
+ 
+   tempWnd = NextWindow (tempWnd);
+  }
+ 
+ }
+ 
+ DestroyControl (dmWnd);
+
+ topWnd = dmWnd->prev;
+
+ if (is_full_app == 1) CloseFullApp ();
+
+ SysBuf.byte1 = WINDOW_DESTROY;
+ if (dmWnd->WinMain != 0) (dmWnd->WinMain) ();
+
+ if (dmWnd->form != 0) HiMemoryFree (dmWnd->form);
+ 
+ dm = (unsigned int) ( (unsigned long)(dmWnd) >> 16 );
+ free (dm);
+ showmouse ();
+
+
+ if ( topWnd == (HWND)0 )
+ {
+  activeButton = (CONTROL)0;
+  activeEditBox = (CONTROL)0;
+  return;
+ }
+
+ tempControl = topWnd->ActiveControl;
+
+ if ( tempControl->ControlType == CONTROL_TYPE_EDITBOX)
+  activeEditBox = topWnd->ActiveControl;
+ else
+  activeEditBox = FindLastEditBox (topWnd);
+
+ if ( tempControl->ControlType == CONTROL_TYPE_BUTTON)
+  activeButton = topWnd->ActiveControl;
+ else
+  activeButton = FindLastButton (topWnd);
+
+ SetColor (0);
+
+ if (activeEditBox != (CONTROL)0)
+ {
+  memcpy (_CS,(unsigned int)TempString,activeEditBox->StrSegment,activeEditBox->StrOffset,49);
+  Line (activeEditBox->x+(Xstrlen(TempString)*8)+5,
+	activeEditBox->y+5,
+	activeEditBox->x+(Xstrlen(TempString)*8)+5,
+	activeEditBox->y+16);
+ }
+
+
+// tempControl = topWnd->ActiveControl;
+}
+
+void DestroyAllWindows (void)
+{
+
+ while ( topWnd != (HWND)0 )
+ {
+  if (topWnd == protectedWnd) return;
+  DestroyWindow (topWnd);
+ }
+ 
+
+}
+
+void SwitchWindow (HWND vhWnd)
+{
+ //CONTROL LastEditBox;
+ unsigned int mret;
+
+ if (is_full_app) return;
+
+ if (vhWnd == topWnd) return;
+
+ hidemouse ();
+ if (topWnd->form == 0)
+  topWnd->form = save_area (topWnd->x,topWnd->y,topWnd->w-8,topWnd->h);
+ else
+ {
+  mret = malloc ( (imagesize (topWnd->x,topWnd->y,topWnd->x+topWnd->w-8,topWnd->y+topWnd->h) >> 4) + 1 );
+  getimage (topWnd->x,topWnd->y,topWnd->x+topWnd->w-8,topWnd->y+topWnd->h,mret);
+  himem_write (mret,0,topWnd->form,imagesize (topWnd->x,topWnd->y,topWnd->x+topWnd->w-8,topWnd->y+topWnd->h) );
+  free (mret);
+ }
+
+  if (activeEditBox != (CONTROL)0 )
+  {
+   SetColor (15);
+   memcpy (_CS,(unsigned int)TempString,activeEditBox->StrSegment,activeEditBox->StrOffset,49);
+   Line (activeEditBox->x+(Xstrlen(TempString)*8)+5,
+	activeEditBox->y+5,
+	activeEditBox->x+(Xstrlen(TempString)*8)+5,
+	activeEditBox->y+16);
+  }
+
+
+
+ restore_area (vhWnd->x,vhWnd->y,vhWnd->w-8,vhWnd->h,vhWnd->form,0);
+
+ (NextWindow (vhWnd))->prev = vhWnd->prev;
+
+ vhWnd->prev = topWnd;
+ topWnd = vhWnd;
+
+  //LastEditBox = activeEditBox; //FindLastEditBox (topWnd);
+
+ tempControl = topWnd->ActiveControl;
+ if ( tempControl->ControlType == CONTROL_TYPE_EDITBOX)
+  activeEditBox = topWnd->ActiveControl;
+ else
+  activeEditBox = FindLastEditBox (topWnd);
+
+ tempControl = topWnd->ActiveControl;
+ if ( tempControl->ControlType == CONTROL_TYPE_BUTTON)
+  activeButton = topWnd->ActiveControl;
+ else
+  activeButton = FindLastButton (topWnd);
+
+
+ SetColor (0);
+
+ if (activeEditBox != (CONTROL)0)
+ {
+  memcpy (_CS,(unsigned int)TempString,activeEditBox->StrSegment,activeEditBox->StrOffset,49);
+  Line (activeEditBox->x+(Xstrlen(TempString)*8)+5,
+	activeEditBox->y+5,
+	activeEditBox->x+(Xstrlen(TempString)*8)+5,
+	activeEditBox->y+16);
+ }
+
+
+ showmouse ();
+}
+
+void TurnWindow (void)
+{
+ if (topWnd == (HWND)0) return;
+ if (topWnd->prev == (HWND)0) return;
+ if (is_full_app) return;
+ SwitchWindow ( NextWindow ( (HWND)0 ) );
+}
+
+static unsigned int MouseX,MouseY,MouseB;
+
+void MoveWindow (void)
+{
+ unsigned int mret;
+ unsigned int Wx,Wy;
+ unsigned int oldWx,oldWy;
+
+ Wx = topWnd->x; oldWx = Wx;
+ Wy = topWnd->y; oldWy = Wy;
+ MouseX = mx; MouseY = my;
+ hidemouse ();
+ MouseB = 3;
+ while ( MouseB == 3 )
+ {
+  if ( (oldWx != Wx) || (oldWy != Wy) )
+  {
+   XORRectangle (oldWx,oldWy,oldWx+topWnd->w,oldWy+topWnd->h);
+   XORRectangle (Wx,Wy,Wx+topWnd->w,Wy+topWnd->h);
+  }
+  oldWx = Wx; oldWy = Wy;
+  asm {
+       push ax
+       push bx
+       push cx
+       push dx
+       mov ax,3
+       int 0x33
+       mov cs:MouseX,cx
+       mov cs:MouseY,dx
+       mov cs:MouseB,bx
+       pop dx
+       pop cx
+       pop bx
+       pop ax
+      }
+  Wx = MouseX; Wy = MouseY;
+ }
+   XORRectangle (topWnd->x,topWnd->y,topWnd->x+topWnd->w,topWnd->y+topWnd->h);
+   XORRectangle (oldWx,oldWy,oldWx+topWnd->w,oldWy+topWnd->h);
+ if (topWnd->form == 0)
+  topWnd->form = save_area (topWnd->x,topWnd->y,topWnd->w-8,topWnd->h);
+ else
+ {
+  mret = malloc ( (imagesize (topWnd->x,topWnd->y,topWnd->x+topWnd->w-8,topWnd->y+topWnd->h) >> 4) + 1 );
+  getimage (topWnd->x,topWnd->y,topWnd->x+topWnd->w-8,topWnd->y+topWnd->h,mret);
+  himem_write (mret,0,topWnd->form,imagesize (topWnd->x,topWnd->y,topWnd->x+topWnd->w-8,topWnd->y+topWnd->h) );
+  free (mret);
+ }
+
+ SetColor (backc);
+ waitretrace ();
+ fastbar (topWnd->x,topWnd->y,topWnd->w+topWnd->x,topWnd->h+topWnd->y);
+ dumWnd = NextWindow ((HWND)0);
+
+ while (dumWnd != topWnd)
+ {
+  waitretrace ();
+  restore_area (dumWnd->x,dumWnd->y,dumWnd->w-8,dumWnd->h,dumWnd->form,0);
+  dumWnd = NextWindow (dumWnd);
+ }
+ Wx = (( (Wx >> 3) + 1) << 3);
+ dumControl = topWnd->LastControl;
+ while (1)
+ {
+  tempControl = dumControl->prev;
+  dumControl->x = (dumControl->x - topWnd->x) + Wx;
+  dumControl->y = (dumControl->y - topWnd->y) + Wy;
+
+  if (dumControl == topWnd->FirstControl) break;
+  dumControl = tempControl;
+ }
+ topWnd->x = Wx; topWnd->y = Wy;
+ restore_area (Wx,Wy,topWnd->w-8,topWnd->h,topWnd->form,0);
+ showmouse ();
+}
+
+void MessageBox (char* Msg)
+{
+ unsigned int Lg;
+ Lg = ( (strlen (Msg) * 8) / 2 );
+ CreateWindow (320-Lg-15,200,(Lg*2)+20,50,3,"Desktop");
+ OutTextXY ( 320 - Lg,220,Msg);
+}
+
+static int show_mouse;
+
+void mouse_handler ()
+{
+ asm { push ax bx cx dx ds };
+ asm { mov ax,cs
+       mov ds,ax }
+
+ if (mouse_status)
+ {
+
+ mx = _CX;
+ my = _DX;
+
+  for (i=0 ; i <= 27 ; i++)
+  {
+    if (flag) setpix ( oldx + cursor [i][0] , oldy + cursor [i][1] , swap[i]);
+  }
+  for (i=0 ; i <= 27 ; i++)
+  {
+     swap [i] = getpix ( mx + cursor [i][0] , my + cursor [i][1] );
+     setpix ( mx + cursor [i][0] , my + cursor [i][1] , cursor [i][2]);
+  }
+
+  flag = 1;
+  oldx = mx;
+  oldy = my;
+ }
+ asm { pop ds dx cx bx ax };
+ asm { retf };
+}
+
+unsigned int ismouse (void)
+{
+ asm {
+       mov ax,0
+       int 0x33
+     }
+}
+
+void showmouse ()
+{
+ register int i;
+
+ if ( ismouse()  != 0xffff) return;
+
+ mx = oldx; my = oldy;
+
+  for (i=0 ; i <= 27 ; i++)
+  {
+     swap [i] = getpix ( mx + cursor [i][0] , my + cursor [i][1] );
+     if (flag) setpix ( mx + cursor [i][0] , my + cursor [i][1] , cursor [i][2]);
+  }
+
+ mouse_status = 1;
+// show_mouse = 1;
+}
+
+void hidemouse ()
+{
+ register int i;
+
+ if ( ismouse()  != 0xffff) return;
+
+  for (i=0 ; i <= 27 ; i++)
+  {
+    if (flag) setpix ( oldx + cursor [i][0] , oldy + cursor [i][1] , swap[i]);
+  }
+ mouse_status = 0;
+ flag = 0;
+// show_mouse = 0;
+}
+
+void init_mouse (unsigned int x,unsigned int y)
+{
+ asm {
+	push ax bx cx es
+	mov ax,4
+	mov bx,x
+	mov cx,y
+	int 0x33
+	mov ax,5
+	mov bx,1
+	mov cx,1
+	int 0x33
+	mov ax,cs
+	mov es,ax
+	mov ax,1
+	mov bx,offset MGRP:_mouse_handler
+	int 0x33
+	mov ax,6
+	int 0x33
+	pop es cx bx ax
+     }
+}
+
+
+void shut_mouse (void)
+{
+ asm {
+	mov ax,2
+	int 0x33
+	mov ax,7
+	int 0x33
+     }
+}
+
+char scankey (void)
+{
+ asm {
+	in al,0x60
+     }
+}
+
+unsigned int bmouse (void)
+{
+ asm {
+	mov ax,3
+	int 0x33
+	mov ax,bx
+     }
+}
+
+handle icoFile;
+unsigned int IcoMem;
+
+unsigned char far* IcoPix [1024];
+
+unsigned char gs [16] = {0,4,2,6,1,5,3,8,7,12,10,14,9,13,11,15};
+
+char IsMask (unsigned int pos)
+{
+ return ( (*IcoPix) [512+126+(pos / 8)] & ( 128 >> (pos % 8) ) );
+}
+
+void ShowIcon (unsigned int x, unsigned int y, char* icofile)
+{
+ unsigned int i,j;
+ unsigned char IcoColor;
+ unsigned char shift;
+ unsigned int pos;
+
+ IcoMem = malloc ( (1024 / 16) );
+ icoFile = fopen (icofile);
+ fread (icoFile,1024,0,IcoMem);
+ IcoPix [0] = (unsigned char far*) (IcoMem * 65536);
+ y += 32;
+ j = x;
+ pos = 0;
+
+ for (i=0; i<=511; i++)
+ {
+   IcoColor = (*IcoPix) [126+i];
+
+
+   if (!IsMask (pos++)) setpix (x,y,gs[(IcoColor >> 4)]);
+   x++;
+   if (!IsMask (pos++)) setpix (x,y,gs[(IcoColor & 0x0f)]);
+   x++;
+
+   if (x==(j+32))
+   {
+    y--;
+    x = j;
+   }
+ }
+ free (IcoMem);
+}
+
+static unsigned int mpic;
+char pic_peek (unsigned int ofs)
+{
+ asm {
+	push es
+	push bx
+	mov ax,mpic
+	mov es,ax
+	mov bx,ofs
+	mov al,es:[bx]
+	pop bx
+	pop es
+     }
+}
+
+void pic (char* picname, int h)
+{
+handle stream;
+
+unsigned int pici=0;
+unsigned int picx,picy;
+signed char picj=0;
+unsigned char pixel;
+
+ 
+ if (gmode == 1) picx = 160;
+ else picx = 240 ;
+ picy = h+200;   
+ mpic = malloc (504);
+ stream = fopen (picname);
+ if (stream < 2) return;
+ fread (stream,8062,0,mpic);
+ for (pici=0;pici<=(8000-1);pici++)
+ {
+  for (picj=0;picj<=7;picj++)
+   {
+    pixel = (pic_peek(pici+62) & (128>>picj));
+    if (!pixel) setpix (picx,picy, 7);
+    picx++;
+    if (gmode == 1)
+    {
+     if (picx==480) { picy--;picx=160;}
+    }
+    else if (picx == 560) { picy--;picx=240;
+   }               
+  }
+ free (mpic);
+}
+
+void ShowMem (void)
+{
+ CreateWindow (120,120,290,85,3,"Memory Usage");
+/*
+ SetColor (7);
+ Bar (145,150,405,165);
+ Bar (145,180,405,195);
+*/
+ SetColor (0);
+ OutTextXY (145,137+2-2,"Real Memory");
+ OutTextXY (145,166+2-2,"High Memory");
+ Rectangle (145,150,405,165);
+ Rectangle (145,180,405,195);
+ SetColor (15);
+ Line (145,165,405,165);
+ Line (405,150,405,165);
+ Line (145,195,405,195);
+ Line (405,180,405,195);
+ SetColor (9);
+ Bar (146,151,146+ ( (260 * avail()) / 0x7000 ),164);
+ Bar (146,181,146+ ( (260 * GetHiMemoryAvail ()) / HiMemoryAvailable () ),194);
+ SetColor (0);
+}
+	       
+
+int popup (int argc, char far* argv [], int x, int y, int w)
+{                        
+ int i,j;
+ char k;
+ unsigned long mbuf;
+
+ x = (( (x >> 3) + 1) << 3);
+ w = (( (w >> 3) + 1) << 3);
+
+ hidemouse ();
+ setFont (1);
+ mbuf = save_area (x,y,w,(argc*16)+2);
+ SetColor (7);
+ Bar (x,y,w+x,y+(argc*16)+2);
+ SetColor (15);
+ Line (x,y,w+x,y);
+ Line (x,y,x,y+(argc*16)+2);
+ SetColor (0);
+ Line (x,y+(argc*16)+2,w+x,y+(argc*16)+2);
+ Line (x+w,y,x+w,y+(argc*16)+2);
+
+ for (i=0; i< (argc-1); i++)
+ {
+  Line (x+1,y+17+(i*16),x+w-1,y+17+(i*16));
+  SetColor (15);
+  Line (x+1,y+18+(i*16),x+w-1,y+18+(i*16));
+  SetColor (0);
+ }
+
+ for (i=0; i<argc; i++)
+  if (argv[i][0] == '#') { SetColor (8);
+			   FarOutTextXY (x+4,y+2+(i*16),argv[i]+1);
+			   SetColor (0);
+			 }
+  else if (argv[i][0] == '-' ) {
+			    SetColor (8);
+			    Line (x,y+8+(i*16),x+w-1,y+8+(i*16));
+			    SetColor (15);
+			    Line (x,y+9+(i*16),x+w-1,y+9+(i*16));
+			    SetColor (0);
+			  }
+  else FarOutTextXY (x+4,y+2+(i*16),argv[i]);
+ SetColor (0);
+ Bar (x+1,y+3,x+w-1,y+16);
+// SetColor (15);
+// Line (x+1,y+2,x+w-1,y+2);
+ SetColor (0);
+ Line (x+1,y+16,x+w-1,y+16);
+ SetColor (15);
+ FarOutTextXY (x+4,y+2,argv[0]);
+ j = 0; k = 72;
+ showmouse ();
+ while ( (k == 72) || (k==80) )
+ {
+   if ( (bmouse () == 1) && (mouse_status) )
+   {
+     if ( (mx > x) && (my > y) && (mx < x+w) && (my < (y+(argc*16)+2) ) )
+     {
+      for (i=0; i<argc; i++)
+      if (  (my > (y+(i*16)+1)) && (my < (y+(i*16)+16) ) )
+      {
+       if ( (argv[i][0] != '#') && (argv[i][0] != '-') )
+       {
+	k = 28;
+		   hidemouse ();
+		   SetColor (7);
+		   Bar (x+1,y+3+(j*16),x+w-1,y+16+(j*16));
+		   SetColor (0);
+		   if (argv[j][0] == '#') { SetColor (8);
+					    FarOutTextXY (x+4,y+2+(j*16),argv[j]+1); }
+		   else FarOutTextXY (x+4,y+2+(j*16),argv[j]);
+		   j = i;
+		   SetColor (0);
+		   Bar (x+1,y+3+(j*16),x+w-1,y+16+(j*16));
+		// SetColor (15);
+		// Line (x+1,y+2+(j*16),x+w-1,y+2+(j*16));
+		 SetColor (0);
+		 Line (x+1,y+16+(j*16),x+w-1,y+16+(j*16));
+		   SetColor (15);
+		   if (argv[j][0] == '#') { SetColor (8);
+					    FarOutTextXY (x+4,y+2+(j*16),argv[j]+1); }
+		   else FarOutTextXY (x+4,y+2+(j*16),argv[j]);
+	 while ( bmouse () == 1);
+		   hidemouse ();
+		   showmouse ();
+       }
+      }
+     } else break; //k = 0;
+   }
+
+   if ( is_key () )
+   {
+    k = getch ();
+    if ( (k==72) || (k==80) )
+    {
+		   SetColor (7);
+		   hidemouse ();
+		   Bar (x+1,y+3+(j*16),x+w-1,y+16+(j*16));
+		   SetColor (0);
+		   if (argv[j][0] == '#') { SetColor (8);
+					    FarOutTextXY (x+4,y+2+(j*16),argv[j]+1); }
+		   else FarOutTextXY (x+4,y+2+(j*16),argv[j]);
+     if ( k == 72 ) {
+		    if (!j) j = (argc - 1);
+		    else j--;
+		    if (argv[j][0] == '-') j--;
+		  }
+     if ( k == 80 ) {
+		   if (j == (argc-1) ) j = 0;
+		   else j++;
+		    if (argv[j][0] == '-') j++;
+		  }
+		   SetColor (0);
+		   Bar (x+1,y+3+(j*16),x+w-1,y+16+(j*16));
+		 //SetColor (15);
+		 //Line (x+1,y+2+(j*16),x+w-1,y+2+(j*16));
+		 SetColor (0);
+		 Line (x+1,y+16+(j*16),x+w-1,y+16+(j*16));
+		   SetColor (15);
+		   if (argv[j][0] == '#') { SetColor (8);
+					    FarOutTextXY (x+4,y+2+(j*16),argv[j]+1); }
+		   else FarOutTextXY (x+4,y+2+(j*16),argv[j]);
+		   showmouse ();
+    }
+   }
+  }
+
+ hidemouse ();
+
+ restore_area (x,y,w,(argc*16)+2,mbuf,1);
+ setFont (0);
+ showmouse ();
+ if (k == 28) return (j+1);
+ else return 0;
+}
+
+static char keycode;
+
+char ReadKey (void)
+{
+ asm {
+  mov ah,18h
+  int 44h
+  mov keycode,ah
+ }
+}
+
+
+#define COLOR_B 0
+#define COLOR_F 15
+#define COLOR_U 4
+
+char far *FarTABuffer;
+
+void DispText (unsigned int ofs, unsigned int x, unsigned int y,
+	       unsigned int w, unsigned int h,unsigned int SizeB,
+	       unsigned int X, unsigned int Y, char update, char cr)
+{
+ unsigned int i,oldY,oldX;
+
+// X = x+5; Y = y+5;
+ oldY = Y; oldX = X;
+
+ for (i = ofs; i <= SizeB; i++)
+ {
+
+  if ( FarTABuffer [i] == 13)
+  {
+   if ( (update == 2) )
+   {
+    SetColor (COLOR_B);
+    Bar (X,Y,X+8,Y+16);
+    if ( (oldY == Y) && (!cr) && (X < (x+w-9-8)) )
+    {
+     break;
+    }
+   }
+
+   if ( (update==1) && (oldY == Y) ) break;
+   else if ( (update==1)  && (X != x+5)) break;
+   else if ( (update ==1) && (X==x+5) )
+   {
+    scroll_down (x,Y,w,h-(Y-y)-18,16);
+    SetColor (COLOR_B);
+    Bar (x+1,Y,x+w-1,Y+16);
+    break;
+   }
+   else
+   {
+    if (update)
+    {
+     SetColor (COLOR_B);
+     Bar (X,Y,x+w-1,Y+16);
+    }
+    X = x+5;
+   }
+  }
+  else if (FarTABuffer [i] == 10)
+  {
+   Y = Y + 16;
+  }
+  else if (FarTABuffer [i] == 0)
+  {
+   //if (X == x+5)
+    Bar (X,Y,x+w-1,Y+16);
+   //else
+   // Bar (X,Y,X+8,Y+16);
+
+   Y += 16;
+   break;
+  }
+  else
+  {
+   if (update)
+   {
+    SetColor (COLOR_B);
+    Bar (X,Y,X+8,Y+16);
+   }
+   PrintChar (FarTABuffer[i],X,Y,COLOR_F,255,0);
+   X += 8;
+  }
+  if ( X >= (x+w-9) )
+  {
+   X = x+5;
+   Y = Y + 16;
+  }
+  if ( Y >= (y+5+h-10)) break;
+ }
+
+// Y += 16;
+
+
+ if ( (Y < (y+5+h-10)) && (update == 2) && (Y != (oldY) ) )
+ {
+  SetColor (COLOR_B);
+//  Bar (x+1,Y,x+w-1,y+h-1);
+  Bar (x+1,Y,x+w-1,Y+16);
+ }
+
+
+}
+
+void DelText (unsigned int TextOfs, unsigned int segbuffer,
+	      unsigned int sizeB)
+{
+ asm {
+	push ax
+	push es
+	push di
+	push ds
+	push si
+	push cx
+	mov ax,segbuffer
+	mov es,ax
+	mov ds,ax
+	mov si,TextOfs
+	mov di,si
+	inc si
+	mov cx,sizeB
+	sub cx,di
+	rep movsb
+	pop cx
+	pop si
+	pop ds
+	pop di
+	pop es
+	pop ax
+     }
+}
+
+void InsText (char c, unsigned int TextOfs,unsigned int segbuffer,
+	      unsigned int sizeB)
+{
+ asm {
+	push ax
+	push cx
+	push es
+	push ds
+	push di
+	push si
+	mov ax,segbuffer
+	mov es,ax
+	mov ds,ax
+	mov si,sizeB
+	sub si,2
+	mov di,sizeB
+	dec di
+	mov cx,sizeB
+	sub cx,2
+	mov ax,TextOfs
+	sub cx,ax
+	inc cx
+	std
+	rep movsb
+	cld
+	mov di,TextOfs
+	mov al,c
+	mov es:[di],al
+	pop si
+	pop di
+	pop ds
+	pop es
+	pop cx
+	pop ax
+     }
+}
+
+
+void send_char (char sc,char scode)
+{
+ asm {
+	 push ax
+	 push cx
+	 mov ah,5
+	 mov ch,scode
+	 mov cl,sc
+	 int 0x16
+	 pop cx
+	 pop ax
+     }
+}
+
+
+unsigned int aci, acX, acY;
+
+
+unsigned int TextArea (unsigned int x, unsigned int y, unsigned int w,
+	       unsigned int h, unsigned int StrSeg, unsigned int StrOfs,
+	       unsigned int SizeB)
+
+{
+// unsigned int MemText;
+ unsigned int X, Y;
+ char l;
+ unsigned int i,oldi;
+ unsigned char tad;
+ unsigned int oldX,oldY;
+ char cr;
+
+
+if (StrOfs == 1234)
+{
+ SetColor (COLOR_B);
+ fastbar (x,y,x+w,y+h);
+// FarTABuffer = (StrSeg * 65536) + StrOfs;
+ FarTABuffer [SizeB] = 0;
+ DispText (0,x,y,w,h,SizeB,x+5,y+5,3,0);
+ return;
+}
+
+ FarTABuffer = (StrSeg * 65536) + StrOfs;
+// X = x+5; Y = y+5;
+
+ i = aci;
+ X = acX;
+ Y = acY;
+
+ PrintChar ('_',X,Y+1,COLOR_U,255,0);
+ l = 0;
+ keycode = 0;
+
+ while ( keycode != 1 )
+ {
+  l = ReadKey ();
+
+  PrintChar ('_',X,Y+1,COLOR_B,255,0);
+
+  switch (keycode)
+  {
+   case 1: break;
+
+   case 75:
+   if (i == 0) break;
+
+    if (X == x+5)
+    {
+     if ( FarTABuffer [i-1] != 10 )
+     {
+      i--;
+      Y -= 16;
+      X = x + 5 + ( (w/8) - 2) * 8;
+
+      if ( Y == (y+5-16))
+      {
+       scroll_down (x,y+1,w,h-18,16);
+       SetColor (COLOR_B);
+       Bar (x+1,y+5,x+w-1,y+16+5);
+       SetColor (3);
+       Y += 16;
+       tad = (w/8)-2;
+//       DispText (i-tad,x,y,w,h,i-tad+(w/8),x+5,Y,1,0);
+
+       X = x+5;
+       for (oldi = i-tad; ((X < (x+w-9)) && (FarTABuffer [oldi] != 13)) ; X += 8)
+	PrintChar (FarTABuffer[oldi++],X,Y,COLOR_F,255,0);
+       X = x + 5 + ( (w/8) - 2) * 8;
+      }
+
+      break;
+     }
+
+     for ( tad = 0;((FarTABuffer [i-3-tad] != 10) && (i-2-tad != 0)); tad++) ;
+
+     if ( tad > ((w/8)-2) ) tad = (tad % ((w/8)-1) ) ;
+	       // =
+     X = x+5+(tad * 8);
+     Y -= 16;
+     i -= 2;
+
+      if ( Y == (y+5-16))
+      {
+      scroll_down (x,y+1,w,h-18,16);
+      SetColor (COLOR_B);
+      Bar (x+1,y+5,x+w-1,y+16+5);
+      SetColor (3);
+      Y += 16;
+      DispText (i-tad,x,y,w,h,i-tad+(w/8),x+5,Y,1,0);
+
+      }
+
+
+     break;
+    }
+
+    else
+    {
+     X -= 8;
+     i--;
+     break;
+    }
+   case 77:
+    if ( FarTABuffer [i] == 0) break;
+
+    if ( X >= (x+w-9-8 ) )
+    {
+     X = x+5;
+     Y = Y + 16;
+     i++;
+
+     oldi = i;
+     if ( Y >= (y+5+h-10))
+     {
+      scroll_up (x,y+18,w,h-18,16);
+      SetColor (COLOR_B);
+      Bar (x+1,y+h-16,x+w-1,y+h-1);
+      SetColor (3);
+      Y = Y - 16;
+      while (1)
+      {
+       if ( X >= (x+w-9) ) break;
+       if (FarTABuffer [i] == 13) break;
+       PrintChar (FarTABuffer[i++],X,Y,COLOR_F,255,0);
+       X = X + 8;
+      }
+      X = x+5;
+      i = oldi;
+     }
+     break;
+    }
+    if ( FarTABuffer [i] == 13 )
+    {
+     X = x+5;
+     Y = Y + 16;
+     i += 2;
+     oldi = i;
+     if ( Y >= (y+5+h-10))
+     {
+      scroll_up (x,y+18,w,h-18,16);
+      SetColor (COLOR_B);
+      Bar (x+1,y+h-16,x+w-1,y+h-1);
+      SetColor (3);
+      Y = Y - 16;
+      while (1)
+      {
+       if ( X >= (x+w-9) ) break;
+       if (FarTABuffer [i] == 13) break;
+       PrintChar (FarTABuffer[i++],X,Y,COLOR_F,255,0);
+       X = X + 8;
+      }
+      X = x+5;
+      i = oldi;
+     }
+     break;
+    }
+    else
+    {
+     X += 8;
+     i++;
+     break;
+    }
+
+
+   case 72:
+    oldX = X; oldY = Y; oldi = 0;
+
+    while (1)
+    {
+
+     if ( i == 0) break;
+
+     if ( (X == oldX) && ( (Y == (oldY-16)) || (oldi) ) ) break;
+
+     if ( X == (x+5) )
+     {
+
+      if ( FarTABuffer [i-1] != 10 )
+      {
+       i--;
+       Y -= 16;
+       X = x + 5 + ( (w/8) - 2) * 8;
+
+       if ( Y == (y+5-16))
+       {
+	scroll_down (x,y+1,w,h-18,16);
+	SetColor (COLOR_B);
+	Bar (x+1,y+5,x+w-1,y+16+5);
+	SetColor (COLOR_F);
+	Y += 16;
+	tad = (w/8)-2;
+//        DispText (i-tad-1,x,y,w,h,i-tad+(w/8),x+5,Y,1,0);
+
+	X = x+5;
+	for (oldi = i-tad; ((X < (x+w-9)) && (FarTABuffer [oldi] != 13)) ; X += 8)
+	 PrintChar (FarTABuffer[oldi++],X,Y,COLOR_F,255,0);
+	X = x + 5 + ( (w/8) - 2) * 8;
+
+	oldi = 1;
+       }
+
+      }
+      else
+      {
+       Y -= 16;
+       for ( tad = 0;((FarTABuffer [i-3-tad] != 10) && (i-2-tad != 0)); tad++) ;
+       if ( tad >= ((w/8)-2) ) tad = (tad % ((w/8)-1) ) ;
+       X = x+5+(tad * 8)+8;
+       i-- ;
+
+       if ( Y == (y+5-16))
+       {
+	scroll_down (x,y+1,w,h-18,16);
+	SetColor (COLOR_B);
+	Bar (x+1,y+5,x+w-1,y+16+5);
+	SetColor (COLOR_F);
+	Y += 16;
+	DispText (i-tad-1,x,y,w,h,i-tad+(w/8),x+5,Y,1,0);
+	oldi = 1;
+       }
+
+       if ( X < (oldX+8) )
+       {
+	X -= 8;
+	i--;
+	break;
+       }
+      }
+     }
+     i--;
+     X -= 8;
+    }
+    break;
+
+
+   case 14:
+    send_char (0,75); send_char (8,83);
+    break;
+
+
+   case 80:
+    oldX = X; oldY = Y;
+    while (1)
+    {
+
+     if ( (X == oldX) && (Y == (oldY+16)) ) break;
+     if (FarTABuffer [i] == 0) break;
+
+     X += 8;
+
+     if ( FarTABuffer [i] == 13)
+     {
+      if ( Y != oldY )
+      {
+       X -= 8;
+       //i--;
+       break;
+      }
+      Y += 16;
+      X = x+5;
+      i++;
+     }
+
+     if ( X >= (x+w-9) )
+     {
+      Y += 16;
+      X = x+5;
+     }
+
+     if ( Y >= (y+5+h-10))
+     {
+      oldX = X;
+      scroll_up (x,y+18,w,h-18,16);
+      SetColor (COLOR_B);
+      Bar (x+1,y+h-16,x+w-1,y+h-1);
+      SetColor (3);
+      Y = Y - 16;
+      i++;
+      for (oldi = i; ((X < (x+w-9)) && (FarTABuffer [oldi] != 13)) ; X += 8)
+       PrintChar (FarTABuffer[oldi++],X,Y,COLOR_F,255,0);
+      X = oldX;
+      break;
+     }
+
+     i++;
+    }
+    break;
+
+   case 83:
+    if (FarTABuffer [i] == 0) break;
+
+    DelText (i,StrSeg,SizeB--);
+    cr = 0;
+    if (FarTABuffer [i] == 10)
+    {
+     DelText (i,StrSeg,SizeB--);
+     cr = 1;
+    }
+
+    DispText (i,x,y,w,h,SizeB,X,Y,2,cr);
+    break;
+
+   case 28:
+    InsText (13,i,StrSeg,++SizeB);
+    InsText (10,i+1,StrSeg,++SizeB);
+    DispText (i,x,y,w,h,SizeB,X,Y,3,0);
+    i += 2;
+    X = x+5;
+    Y += 16;
+
+     if ( Y >= (y+5+h-10))
+     {
+      scroll_up (x,y+18,w,h-18,16);
+      SetColor (COLOR_B);
+      Bar (x+1,y+h-16,x+w-1,y+h-1);
+      SetColor (3);
+      Y = Y - 16;
+      for (oldi = i; ((X < (x+w-9-8)) && (FarTABuffer [oldi] != 13)) ; X += 8)
+       PrintChar (FarTABuffer[oldi++],X,Y,COLOR_F,255,0);
+      X = x+5;
+     }
+    break;
+
+   default:
+
+    // if ( l == 0 ) break;
+
+    InsText (l,i,StrSeg,++SizeB);
+    DispText (i,x,y,w,h,SizeB,X,Y,1,0);
+    X += 8;
+    i++;
+
+    if ( X >= (x+w-9) )
+    {
+     X = x+5; 
+     Y += 16;
+
+     if ( Y >= (y+5+h-10))
+     {
+      scroll_up (x,y+18,w,h-18,16);
+      SetColor (COLOR_B);
+      Bar (x+1,y+h-16,x+w-1,y+h-1);
+      SetColor (3);
+      Y = Y - 16;
+     }
+    }
+
+    break;
+  }
+ 
+  PrintChar ('_',X,Y+1,COLOR_U,255,0);
+ }
+ PrintChar ('_',X,Y+1,COLOR_B,255,0);
+
+ aci = i;
+ acX = X;
+ acY = Y;
+
+ return SizeB;
+}
+
+char far *FarEditString;
+
+void EditBoxReadLn (unsigned int x, unsigned int y, unsigned int w,
+		    unsigned int StrSeg, unsigned int StrOfs, char c,char pwd)
+{
+ char EditKey;
+ unsigned int Xpos;
+ unsigned char Strpos;
+
+ // SetColor (4); Rectangle ( x,y,x+w,y+16+3);
+ SetColor (0);
+ FarEditString = (StrSeg * 65536) + StrOfs;
+ Xpos = x + (Xstrlen (FarEditString)*8) + 5;
+ Strpos = Xstrlen (FarEditString);
+ Line (Xpos,y+5,Xpos,y+16);
+ do
+ {
+  if (c == 0) EditKey = ReadKey ();
+  else EditKey = c;
+
+  if ( (EditKey == 13) || (EditKey == 27) );
+  else if (EditKey == 8)
+  {
+   if (Xpos == (x+5)) continue;
+   Xpos -= 8;
+   FarEditString [--Strpos] = 0;
+   SetColor (15); Bar (Xpos,y+5,Xpos+8,y+17); SetColor (0);
+   Line (Xpos,y+5,Xpos,y+16);
+   SetColor (15); Line (Xpos+8,y+5,Xpos+8,y+16); SetColor (0);
+  }
+  else
+  {
+   if ( (Xpos+8) > (x+w) ) continue;
+   if (pwd) PrintChar ('*',Xpos,y+5,0,255,0);
+   else PrintChar (EditKey,Xpos,y+5,0,255,0);
+   FarEditString [Strpos] = EditKey;
+   FarEditString [++Strpos] = 0;
+   Line (Xpos+8,y+5,Xpos+8,y+16);
+   SetColor (15); Line (Xpos,y+5,Xpos,y+16); SetColor (0);
+   Xpos += 8;
+  }
+ } while ( (EditKey != 13) && (EditKey != 27) && (c==0) );
+// SetColor (15); Line (Xpos,y+5,Xpos,y+16); SetColor (0);
+// Rectangle ( x,y,x+w,y+16+3); SetColor (0);
+}
+
+static CONTROL LastEditBox;
+
+CONTROL FindLastEditBox (HWND fhWnd)
+{
+
+ LastEditBox = fhWnd->ActiveControl;
+ if (LastEditBox == (CONTROL)0) return (CONTROL)0;
+
+ if (LastEditBox->ControlType == CONTROL_TYPE_EDITBOX)
+  return LastEditBox;
+
+ LastEditBox = fhWnd->LastControl;
+
+ while (LastEditBox != (CONTROL)0)
+ {
+  if (LastEditBox->ControlType == CONTROL_TYPE_EDITBOX)
+   return LastEditBox;
+  LastEditBox = LastEditBox->prev;
+ }
+
+ return (CONTROL)0;
+}
+
+CONTROL FindLastButton (HWND fhWnd)
+{
+ CONTROL LastButton;
+
+  LastButton = fhWnd->ActiveControl;
+
+  if (LastButton == (CONTROL)0) return (CONTROL)0;
+ if (LastButton->ControlType == CONTROL_TYPE_BUTTON)
+  return LastButton;
+
+ LastButton = fhWnd->LastControl;
+
+ while (LastButton != (CONTROL)0)
+ {
+  if (LastButton->ControlType == CONTROL_TYPE_BUTTON)
+   return LastButton;
+  LastButton = LastButton->prev;
+ }
+
+ return (CONTROL)0;
+}
+
+
+void WriteKey (char c)
+{
+ asm {
+	mov ah,5
+	mov cl,c
+	mov ch,0
+	int 0x16
+     }
+}
+
+void EditBoxPut (char c)
+{
+
+ CONTROL dumControl;
+
+ dumControl = activeEditBox; //FindLastEditBox(topWnd);
+
+ if (dumControl == (CONTROL)0) return;
+
+ hidemouse ();
+ EditBoxReadLn (dumControl->x,dumControl->y,dumControl->w,
+		  dumControl->StrSegment,dumControl->StrOffset,c,dumControl->size);
+ showmouse ();
+}
+
+void TurnControl (void)
+{
+ if (topWnd == (HWND)0) return;
+ if (topWnd->ActiveControl == (CONTROL)0) return;
+ if (topWnd->FirstControl == topWnd->LastControl) return;
+
+ hidemouse ();
+ dumControl = topWnd->ActiveControl;
+ SetColor (7);
+ Rectangle ( dumControl->x,dumControl->y,dumControl->x+dumControl->w,
+	     dumControl->y+dumControl->h);
+
+
+ dumControl = topWnd->ActiveControl;
+ if (dumControl->prev == (CONTROL)0) dumControl = topWnd->LastControl;
+ else dumControl = dumControl->prev;
+ SetColor (0);     
+ Rectangle ( dumControl->x,dumControl->y,dumControl->x+dumControl->w,
+	     dumControl->y+dumControl->h);
+
+ if (dumControl->ControlType == CONTROL_TYPE_EDITBOX )
+ {
+  LastEditBox = activeEditBox; //FindLastEditBox (topWnd);
+  if (LastEditBox != (CONTROL)0 )
+  {
+   SetColor (15);
+   memcpy (_CS,(unsigned int)TempString,LastEditBox->StrSegment,LastEditBox->StrOffset,49);
+   Line (LastEditBox->x+(Xstrlen(TempString)*8)+5,
+	LastEditBox->y+5,
+	LastEditBox->x+(Xstrlen(TempString)*8)+5,
+	LastEditBox->y+16);
+  }
+  SetColor (0);
+  memcpy (_CS,(unsigned int)TempString,dumControl->StrSegment,dumControl->StrOffset,49);
+  Line (dumControl->x+(Xstrlen(TempString)*8)+5,
+	dumControl->y+5,
+	dumControl->x+(Xstrlen(TempString)*8)+5,
+	dumControl->y+16);
+  activeEditBox = dumControl;
+ }
+
+ if (dumControl->ControlType == CONTROL_TYPE_BUTTON)
+  activeButton = dumControl;
+
+ topWnd->ActiveControl = dumControl;
+ showmouse ();
+}
+
+unsigned char HoldKey;
+
+char xmod;
+char Pa;
+
+void ExecuteControl (void);
+
+void ExecuteControl ()
+{
+ unsigned char k;
+ if (topWnd == (HWND)0) return;
+ if (topWnd->FirstControl == (CONTROL)0) return;
+
+ dumControl = topWnd->ActiveControl;
+
+ switch (dumControl->ControlType)
+ {
+  case CONTROL_TYPE_BUTTON:
+   memcpy (_CS,(unsigned int)TempString,dumControl->StrSegment,dumControl->StrOffset,49);
+   hidemouse ();
+   pButton (dumControl->x,dumControl->y,dumControl->x+dumControl->w,
+	    dumControl->y+dumControl->h,TempString);
+   do
+   {
+    if (is_key()) getch();
+    k = scankey ();
+   } while ( HoldKey == k );
+   if (mouse_status) while ( bmouse () == 1 );
+   Button (dumControl->x,dumControl->y,dumControl->x+dumControl->w,
+	   dumControl->y+dumControl->h,TempString);
+   SysBuf.byte2 = dumControl->ControlID;
+   SysBuf.byte1 = CONTROL_BUTTON;
+   showmouse ();
+
+ // Trinacria.
+
+   if (Pa == 2) topWnd->ActiveControl = tempControl;
+   Pa = 0;
+   if (topWnd->WinMain != 0) (topWnd->WinMain) ();
+   break;
+
+  case CONTROL_TYPE_EDITBOX:
+//   hidemouse ();
+//   EditBoxReadLn (dumControl->x,dumControl->y,dumControl->w,
+//                  dumControl->StrSegment,dumControl->StrOffset,0,dumControl->size);
+//   showmouse ();
+
+  if (activeButton != (CONTROL)0)
+  {
+   topWnd->ActiveControl = activeButton;
+
+ // Pa.
+ //
+
+   tempControl = dumControl;
+   Pa = 2;
+   if (xmod != 1) ExecuteControl ();
+
+   //topWnd->ActiveControl = dumControl;
+
+  }
+
+   break;
+
+  case CONTROL_TYPE_TXTAREA:
+   hidemouse ();
+   aci = dumControl->word1;
+   acX = dumControl->word2+ topWnd->x+5;
+   acY = dumControl->word3+ topWnd->y+20;
+   dumControl->size =
+   TextArea (dumControl->x,dumControl->y,dumControl->w,dumControl->h,
+	     dumControl->StrSegment,dumControl->StrOffset,
+	     dumControl->size);
+   dumControl->word1 = aci;
+   dumControl->word2 = acX- (topWnd->x+5);
+   dumControl->word3 = acY- (topWnd->y+20);
+   showmouse ();
+   break;
+
+  case CONTROL_TYPE_CYCLER:
+   hidemouse ();
+   dumControl->word1 ++;
+   if (dumControl->word1 == dumControl->word2 )
+    dumControl->word1 = 0;
+   memcpy (_CS,(unsigned int)TempString,dumControl->StrSegment,dumControl->StrOffset+PosString ((char far*)(dumControl->StrSegment * 65536 + dumControl->StrOffset),dumControl->word1),49) ;
+   SetColor (7);
+   Bar (dumControl->x+31,dumControl->y+2,dumControl->x+dumControl->w-2,dumControl->y+dumControl->h-2);
+   SetColor (0);
+   setFont (0);
+   OutTextXY(dumControl->x+1+25+5,dumControl->y+1+2  +2-2,TempString);
+   showmouse ();
+   break;
+
+  default: // modification
+   SysBuf.byte1 = CONTROL_EXEC;
+   if (topWnd->WinMain != 0) (topWnd->WinMain) ();
+   break;
+ }
+}
+
+CONTROL CreateControl (unsigned int x, unsigned int y, unsigned int w,
+		      unsigned int h, HWND hWnd, unsigned char ID, unsigned char ControlType,
+		      unsigned int CapSegment, unsigned int CapOffset, unsigned int size)
+{
+
+ LastEditBox = FindLastEditBox (hWnd);
+
+ if (hWnd->ActiveControl != (CONTROL)0)
+ {
+  dumControl = hWnd->ActiveControl;
+  SetColor (7);
+  Rectangle ( dumControl->x,dumControl->y,dumControl->x+dumControl->w,
+	     dumControl->y+dumControl->h);
+ }
+ dumControl = (unsigned long) malloc (2);
+ asm { shl dword ptr dumControl,16 };
+ dumControl->x = x+hWnd->x+5;
+ dumControl->y = y+hWnd->y+20;
+ dumControl->w = w;
+ dumControl->h = h;
+ dumControl->size = size;
+ dumControl->ControlID = ID;
+ dumControl->ControlType = ControlType;
+ dumControl->StrSegment = CapSegment;
+ dumControl->StrOffset = CapOffset;
+ dumControl->prev = hWnd->LastControl;
+ memcpy (_CS,(unsigned int)TempString,CapSegment,CapOffset,49);
+
+ if (hWnd->FirstControl == (CONTROL)0)
+ {
+  hWnd->FirstControl = dumControl;
+  dumControl->prev = (CONTROL)0;
+ }
+ else
+  dumControl->prev = hWnd->ActiveControl;
+
+ hWnd->ActiveControl = dumControl;
+ hWnd->LastControl = dumControl;
+
+ switch (ControlType)
+ {
+ case CONTROL_TYPE_BUTTON:
+  Button (x+hWnd->x+5,y+hWnd->y+20,x+hWnd->x+5+w,y+hWnd->y+20+h,TempString);
+  activeButton = dumControl;
+  break;
+ case CONTROL_TYPE_EDITBOX:
+  SetColor (15);
+  Bar (x+hWnd->x+5,y+hWnd->y+20,x+hWnd->x+5+w,y+hWnd->y+20+h);
+
+//  SetColor (8);
+//  Rectangle (x+hWnd->x+5+1,y+hWnd->y+20+1,x+hWnd->x+5+w-1,y+hWnd->y+20+h-1);
+
+  Line (x+hWnd->x+5,y+hWnd->y+20+h+1,x+hWnd->x+5+w,y+hWnd->y+20+h+1);
+  SetColor (7);
+  Line (x+hWnd->x+5+w-2,y+hWnd->y+20,x+hWnd->x+5+w-2,y+hWnd->y+20+h+1);
+
+  SetColor (0);
+  Line (x+hWnd->x+5+1,y+hWnd->y+20+1,x+hWnd->x+5+1,y+hWnd->y+20+h-1); 
+  Line (x+hWnd->x+5+1,y+hWnd->y+20+1,x+hWnd->x+5+w-2,y+hWnd->y+20+1);
+
+  OutTextXY (x+hWnd->x+5+5,y+hWnd->y+20+5,TempString);
+
+  // COSA NOSTRA
+
+ activeEditBox = dumControl;
+ SetColor (0);
+ Line (x+hWnd->x+5+(Xstrlen(TempString)*8)+5,y+hWnd->y+20+5,x+hWnd->x+5+(Xstrlen(TempString)*8)+5,y+hWnd->y+20+16);
+
+ if (LastEditBox != (CONTROL)0 )
+ {
+ memcpy (_CS,(unsigned int)TempString,LastEditBox->StrSegment,
+	 LastEditBox->StrOffset,49);
+  SetColor (15);
+  Line (LastEditBox->x+(Xstrlen(TempString)*8)+5,
+	LastEditBox->y+5,
+	LastEditBox->x+(Xstrlen(TempString)*8)+5,
+	LastEditBox->y+16);
+ }
+
+
+
+  break;
+ case CONTROL_TYPE_TXTAREA:
+  SetColor (COLOR_B);
+  fastbar (x+hWnd->x+5,y+hWnd->y+20,x+hWnd->x+w+5,y+hWnd->y+h+20+1);
+//  SetColor (15);
+//  Rectangle (x+hWnd->x+5+1,y+1+hWnd->y+20,x+hWnd->x+w+5-1,y+hWnd->y+h+20-1);
+  FarTABuffer = (CapSegment * 65536) + CapOffset;
+  FarTABuffer [size] = 0;
+  dumControl->word1 = 0;
+  dumControl->word2 = x+5;
+  dumControl->word3 = y+5;
+  DispText (0,x+hWnd->x+5,y+hWnd->y+20,w,h,size,x+hWnd->x+5+5,y+hWnd->y+5+20,3,0);
+  break;
+ case CONTROL_TYPE_CYCLER:
+  SetColor (15);
+  Line (x+hWnd->x+5+1,y+hWnd->y+20+1,x+hWnd->x+5+1,y+hWnd->y+20+h-1); 
+  Line (x+hWnd->x+5+1,y+hWnd->y+20+1,x+hWnd->x+5+w-1,y+hWnd->y+20+1);
+  SetColor (0);
+  Line (x+hWnd->x+5+w-1,y+hWnd->y+20+1,x+hWnd->x+5+w-1,y+hWnd->y+20+h-1); 
+  Line (x+hWnd->x+5+1,y+hWnd->y+20+h-1,x+hWnd->x+5+w-2,y+hWnd->y+20+h-1);
+  SetColor (15);
+  Line (x+hWnd->x+5+1+21,y+hWnd->y+20+1,x+hWnd->x+5+1+21,y+hWnd->y+20+h-1); 
+  SetColor (0);
+  Line (x+hWnd->x+5+1+20,y+hWnd->y+20+1,x+hWnd->x+5+1+20,y+hWnd->y+20+h-1); 
+
+  Line (x+hWnd->x+5+1+4,y+hWnd->y+20+1+4+1,x+hWnd->x+5+1+4,y+hWnd->y+20+h-1-4-1+1);
+  Line (x+hWnd->x+5+1+4+1,y+hWnd->y+20+1+4,x+hWnd->x+5+1+4+1,y+hWnd->y+20+h-1-4+1);
+  Line (x+hWnd->x+5+1+4,y+hWnd->y+20+1+4,x+hWnd->x+5+1+4+12,y+hWnd->y+20+1+4);
+  Line (x+hWnd->x+5+1+4+1,y+hWnd->y+20+1+4-1,x+hWnd->x+5+1+4+12-1,y+hWnd->y+20+1+4-1);
+  Line (x+hWnd->x+5+1+4+1,y+hWnd->y+20+h-1-4+1,x+hWnd->x+5+1+4+12-1,y+hWnd->y+20+h-1-4+1);
+  Line (x+hWnd->x+5+1+4+1,y+hWnd->y+20+h-1-4,x+hWnd->x+5+1+4+12,y+hWnd->y+20+h-1-4);
+
+  Line (x+hWnd->x+5+4+12,y+hWnd->y+20+1+4+1,x+hWnd->x+5+4+12,y+hWnd->y+20+1+4+1+3);
+  Line (x+hWnd->x+5+4+1+12,y+hWnd->y+20+1+4+1,x+hWnd->x+5+4+1+12,y+hWnd->y+20+1+4+1+3);
+  Line (x+hWnd->x+5+4+12,y+hWnd->y+20+h-1-4-1,x+hWnd->x+5+4+12,y+hWnd->y+20+h-1-4);
+  Line (x+hWnd->x+5+4+1+12,y+hWnd->y+20+h-1-4-1,x+hWnd->x+5+4+1+12,y+hWnd->y+20+h-1-4);
+
+  Line (x+hWnd->x+5+4+12-1,y+hWnd->y+20+1+4+1+2,x+hWnd->x+5+4+1+12+1,y+hWnd->y+20+1+4+1+2);
+  setFont (0);
+  memcpy (_CS,(unsigned int)TempString,CapSegment,CapOffset+PosString ((char far*)(CapSegment * 65536 + CapOffset),0),49) ;
+  OutTextXY(x+hWnd->x+5+1+25+5,y+hWnd->y+20+1+2   +2-2,TempString);
+  dumControl->word1 = 0;
+  dumControl->word2 = size;
+
+  break;
+
+ }
+
+ SetColor (0);
+ Rectangle (x+hWnd->x+5,y+hWnd->y+20,x+hWnd->x+5+w,y+hWnd->y+h+20);
+ return dumControl;
+}
+
+
+#define MOUSE_CLICK 0xA0
+
+int quit=0;
+unsigned int Xkey;
+//CONTROL tempControl;
+
+// ****************************************************************** WMan **
+void WindowManager (void)
+{
+ char is_control;
+ while (!quit)
+ {
+
+  xmod = 0;
+
+  // ** Mouse-event *******************************************************
+  if ( (bmouse () == 2) && mouse_status)
+  {
+   TickMenu ();
+  }
+  else
+  if ( (bmouse () == 3) && mouse_status)
+  {
+   if (  (mx > (topWnd->x+15))&&(my > topWnd->y)
+       &&(mx < (topWnd->x+topWnd->w))&&(my < (topWnd->y+15)) )
+   {
+    MoveWindow ();
+   }
+  }
+  else
+  if ( (bmouse () == 1) && mouse_status)
+  {
+   if (topWnd == (HWND)0) continue;
+
+   is_control = 0;
+
+   if (  (mx > topWnd->x)&&(my > topWnd->y)
+       &&(mx < (topWnd->x+topWnd->w))&&(my < (topWnd->y+topWnd->h)))
+   {
+    if (  (mx > topWnd->x)&&(my > topWnd->y)
+	&&(mx < (topWnd->x+15))&&(my < (topWnd->y+15)) )
+    {
+     DestroyWindow (topWnd);
+    }
+
+    else
+    {
+     dumControl = topWnd->LastControl;
+     do
+     {
+      if (  (mx > dumControl->x)&&(my > dumControl->y)
+       &&(mx < (dumControl->x+dumControl->w))&&(my < (dumControl->y+dumControl->h)) )
+      {
+       is_control = 1;
+
+
+       xmod = 1;
+
+       hidemouse ();
+       tempControl = topWnd->ActiveControl;
+       SetColor (7);
+       Rectangle (tempControl->x,tempControl->y,tempControl->x+tempControl->w,
+		  tempControl->y+tempControl->h);
+
+
+ if (dumControl->ControlType == CONTROL_TYPE_EDITBOX )
+ {
+  LastEditBox = activeEditBox; //FindLastEditBox (topWnd);
+  if (LastEditBox != (CONTROL)0 )
+  {
+   SetColor (15);
+   memcpy (_CS,(unsigned int)TempString,LastEditBox->StrSegment,LastEditBox->StrOffset,49);
+   Line (LastEditBox->x+(Xstrlen(TempString)*8)+5,
+	LastEditBox->y+5,
+	LastEditBox->x+(Xstrlen(TempString)*8)+5,
+	LastEditBox->y+16);
+  }
+  SetColor (0);
+  memcpy (_CS,(unsigned int)TempString,dumControl->StrSegment,dumControl->StrOffset,49);
+  Line (dumControl->x+(Xstrlen(TempString)*8)+5,
+	dumControl->y+5,
+	dumControl->x+(Xstrlen(TempString)*8)+5,
+	dumControl->y+16);
+  activeEditBox = dumControl;
+ }
+
+
+
+
+
+       SetColor (0);
+       Rectangle (dumControl->x,dumControl->y,dumControl->w+dumControl->x,
+		  dumControl->y+dumControl->h);
+       showmouse ();
+       topWnd->ActiveControl = dumControl;
+
+       // OutTextXY (10,10,"ExecuteControl ()");
+
+       ExecuteControl ();
+
+
+
+       while ( bmouse () == 1 ) ;
+
+       break;
+      }
+      if (dumControl == topWnd->FirstControl) break;
+      dumControl = dumControl->prev;
+     } while ( 1 );
+
+     SysBuf.byte1 = MOUSE_CLICK;
+     SysBuf.word1 = mx; SysBuf.word2 = my;
+     if ( (topWnd->WinMain != 0) && (!is_control) ) (topWnd->WinMain) ();
+    }
+   }
+   else if (is_full_app == 0) 
+   {
+    dumWnd = topWnd->prev;
+    while ( dumWnd != (HWND)0)
+    {
+     if (  (mx > dumWnd->x)&&(my > dumWnd->y)
+	 &&(mx < (dumWnd->x+dumWnd->w))&&(my < (dumWnd->y+dumWnd->h)))
+     {
+      SwitchWindow (dumWnd);
+      break;
+     }
+     dumWnd = dumWnd->prev;
+    }
+   }
+
+   // while ( bmouse () == 1 ) ;
+  }
+
+  // ** KEY-event *********************************************************
+
+  if (is_key ())
+  {
+   Xkey = Xgetch ();
+   HoldKey = scankey();
+   switch (Xkey)
+   {
+    case 27392: if (topWnd != (HWND)0) 
+		 if (topWnd != protectedWnd)
+		  DestroyWindow (topWnd); break;
+    case  3711: quit = 1; break;
+    case  3849: TurnControl (); break;
+    case  3840: TurnWindow (); break;
+    case  7181: ExecuteControl (); break;
+    case  7178: TickMenu (); break;
+    default:
+
+	     EditBoxPut ( (char) Xkey );
+
+	     break;
+   }
+  }
+ }
+}
+
+void intr (void* funcptr, char intc)
+{
+ asm {
+	push ax
+	push bx
+	push es
+	xor ax,ax    
+	mov es,ax
+	xor bh,bh
+	mov bl,intc
+	shl bx,2             
+	mov ax,funcptr
+	mov es:[bx],ax   
+	mov ax,cs
+	mov word ptr es:[bx+2],ax
+	pop es
+	pop bx
+	pop ax
+       }
+}
+
+unsigned long MakePtr (unsigned int seg, unsigned int ofs)
+{
+ return (unsigned long)((seg * 65536) + ofs);
+}
+
+void halt (void)
+{
+  hidemouse ();
+   Background (0);
+   SetVideo (OFF);
+   pic ("/lib/shut.bmp",140);
+   SetVideo (ON);
+   asm { xor ax,ax ; int 0x16 ; hlt };
+}
+
+static unsigned int DataSegment;
+
+void interrupt Int48 (void)
+{
+ _AX = _DS;
+ _BX = _CS;
+ _DS = _BX;
+  DataSegment = _AX;
+
+ if (SysBuf.function == 0x01)
+ {
+  memcpy (_CS,(unsigned int)TempString,SysBuf.word5,SysBuf.word6,49);
+  SysBuf.dword1 = (unsigned long)CreateWindow (SysBuf.word1, SysBuf.word2,
+					       SysBuf.word3, SysBuf.word4,
+					       SysBuf.byte1,TempString);
+ }
+ if (SysBuf.function == 0x02)
+   ((HWND)(SysBuf.dword1)) -> WinMain = (void far*)MakePtr (SysBuf.word3,SysBuf.word4);
+ if (SysBuf.function == 0x03)
+  FarOutTextXY (SysBuf.word1+((HWND)(SysBuf.dword1))->x+5,((HWND)(SysBuf.dword1)) ->y+20+SysBuf.word2,
+  (char far*)MakePtr (SysBuf.word5,SysBuf.word6) );
+ if (SysBuf.function == 0x04)
+  setFont (SysBuf.byte1);
+ if (SysBuf.function == 0x05)
+  SetColor (SysBuf.byte1);
+ if (SysBuf.function == 0x06)
+  SysBuf.word1 = HiMemoryAvailable ();
+ if (SysBuf.function == 0x07)
+  SysBuf.dword1 = HiMemoryAlloc (SysBuf.dword1);
+ if (SysBuf.function == 0x08)
+  HiMemoryFree (SysBuf.dword1);
+ if (SysBuf.function == 0x09)
+  (unsigned long)SysBuf.dword1 = CreateControl (SysBuf.word1,SysBuf.word2,
+						SysBuf.word3,SysBuf.word4,
+						(HWND)SysBuf.dword1,
+						SysBuf.byte1,SysBuf.byte2,
+						SysBuf.word5,SysBuf.word6,
+						SysBuf.word7);
+ if (SysBuf.function == 0x10)
+  SysBuf.byte1 = popup (SysBuf.byte2,(char far** )MakePtr (SysBuf.word1,SysBuf.word2),
+			SysBuf.word3,SysBuf.word4,SysBuf.word5);
+
+ if (SysBuf.function == 0x11)
+  quit = 1;
+ if (SysBuf.function == 0x12)
+  showmouse ();
+ if (SysBuf.function == 0x13)
+  hidemouse ();
+ if (SysBuf.function == 0x14)
+  Bar (SysBuf.word1,SysBuf.word2,SysBuf.word3,SysBuf.word4);
+ if (SysBuf.function == 0x15)
+  Rectangle (SysBuf.word1,SysBuf.word2,SysBuf.word3,SysBuf.word4);
+ if (SysBuf.function == 0x16)
+  console ();
+ if (SysBuf.function == 0x17)
+ {
+  memcpy (_CS,(unsigned int)TempString,SysBuf.word5,SysBuf.word6,49);
+  MessageBox (TempString);
+ }
+ if (SysBuf.function == 0x18)
+ {
+  memcpy (_CS,(unsigned int)TempString,SysBuf.word5,SysBuf.word6,49);
+  CommandTerm (TempString,SysBuf.byte1);
+ }
+ if (SysBuf.function == 0x19)
+ {
+  memcpy (_CS,(unsigned int)TempString,SysBuf.word5,SysBuf.word6,49);
+  ShowIcon (SysBuf.word1+((HWND)(SysBuf.dword1))->x+5,
+	    SysBuf.word2+((HWND)(SysBuf.dword1))->y+20,TempString);
+ }
+ if (SysBuf.function == 0x20)
+  DestroyWindow ( (HWND)SysBuf.dword1 );
+ if (SysBuf.function == 0x21)
+ {
+  ((CONTROL)(SysBuf.dword1))->size = SysBuf.word1;
+  aci = 0;
+  acX = ((CONTROL)(SysBuf.dword1))->x+5;
+  acY = ((CONTROL)(SysBuf.dword1))->y+20;
+  TextArea ( ((CONTROL)(SysBuf.dword1))->x,((CONTROL)(SysBuf.dword1))->y,
+	     ((CONTROL)(SysBuf.dword1))->w,((CONTROL)(SysBuf.dword1))->h,
+	     ((CONTROL)(SysBuf.dword1))->StrSegment,1234,SysBuf.word1);
+ }
+ if (SysBuf.function == 0x22)
+ {
+  SysBuf.word1 = ((CONTROL)(SysBuf.dword1))->size;
+ }
+
+ if (SysBuf.function == 0x23)
+ {
+  protectedWnd = (HWND)SysBuf.dword1;
+ }
+ if (SysBuf.function == 0x24) InitFullApp ();
+ if (SysBuf.function == 0x25) CloseFullApp ();
+ if (SysBuf.function == 0x26) console ();
+ if (SysBuf.function == 0x27) About ();
+ if (SysBuf.function == 0x28) halt();
+ if (SysBuf.function == 0x29) ShowMem ();
+ if (SysBuf.function == 0x30)
+ {
+  SysBuf.byte1 = gmode ;
+ }
+
+ _AX = DataSegment;
+ _DS = _AX;
+}
+
+char GetProc (void)
+{
+ asm {
+  push ds
+  push si
+  mov ah,0x19
+  int 0x44
+  mov ax,0x2000
+  mov ds,ax
+  mov al,ds:[si]
+  pop si
+  pop ds
+  }
+}
+
+#define abouty 260
+
+void About (void)
+{
+
+ BGWindow = 0;
+ hidemouse ();
+ CreateWindow (160,50,320,220+14,3,"About");
+ pic ("/qwin/logo.pic",50+10);
+ BGWindow = 7;
+// ShowIcon (93,145,"/qwin/eye.ico");
+// setFont (0);
+// SetColor (12);
+// OutTextXY (130,145,"QuickWindows");
+// Line (130,160,234,160);
+ setFont (2);
+ SetColor (15);
+ OutTextXY (170+8,abouty,"CPU:");
+ OutTextXY (170+100,abouty,"Kernel:");
+ OutTextXY (170+100+120+8,abouty,"Memory:");
+ SetColor (7);
+ setFont (0);
+ OutTextXY (170+5*8,abouty," 86");
+ OutTextXY (170+100+7*8+8,abouty,"R0.4b");
+ PrintChar (GetProc (),170+5*8,abouty,7,255,0);
+ PrintChar ( ((HiMemoryAvailable () / 1024) / 10)+48,390+8*7+8,abouty,7,255,0);
+ PrintChar ( ((HiMemoryAvailable () / 1024) % 10)+48+1,390+8*7+8+8,abouty,7,255,0);
+ setFont (2);
+ showmouse ();
+ BGWindow = 7;
+ setFont (0);
+}
+
+void VideoLock (void)
+{
+ SetVideo (OFF);
+ while ( !is_key () ) ;
+ SetVideo (ON);
+}
+
+void CommandTerm (char* tcmd, char scr)
+{
+ int i;
+ if (scr != 1) WriteKey ('@');
+ for (i = 0; tcmd[i] != 0; i++)
+  WriteKey (tcmd[i]);
+ WriteKey ('\r');
+ console ();
+}
+
+static unsigned int bufferbatch;
+
+ char peekchar (unsigned int ofs)
+ {
+  asm {
+	push ds
+	push si
+	mov ax,bufferbatch
+	mov ds,ax
+	mov si,ofs
+	lodsb
+	pop si
+	pop ds
+      }
+ }
+
+ void putchar (unsigned int ofs,char pc)
+ {
+  asm {
+	push es
+	push di
+	mov ax,bufferbatch
+	mov es,ax
+	mov di,ofs
+	mov al,pc
+	stosb
+	pop di
+	pop es
+      }
+ }
+
+ int file_offset;
+
+ int fgets (char* s)
+ {
+  int i;
+  for (i=0; (peekchar (file_offset+i) != 13) && (peekchar (file_offset+i) != 0);i++) s[i] = peekchar (file_offset+i);
+  if (peekchar (file_offset+i) == 0) return 0;
+  s[i] = 0;
+  file_offset += i+2;
+  return 1;
+ }
+
+ char cmdsh [30];
+ char far* rcCmd [24];
+
+ char* script (char *batchfile)
+ {
+  handle bfile;
+  char ScanFile;
+  int counter=0;
+  int result;
+
+  bfile = fopen (batchfile);
+  if (bfile < 2) return;
+  bufferbatch = malloc ( (fsize (bfile) / 16) + 1);
+  if (!bufferbatch) return;
+  counter = 0;
+  fread (bfile,fsize (bfile),0,bufferbatch);
+  file_offset = 0;
+
+  rcCmd [0] = (char far*)MakePtr (bufferbatch,file_offset);
+
+  for ( ; ScanFile != '!' ; file_offset++)
+  {
+   ScanFile = peekchar (file_offset);
+   if (ScanFile == 13) putchar (file_offset,32);
+   if (ScanFile == 10)
+   {
+    putchar (file_offset,0);
+    counter++;
+    rcCmd [counter] = (char far*)MakePtr (bufferbatch,file_offset+1);
+   }
+  }
+  result = popup (counter,rcCmd, mx, my,100);
+  if (result == 0)
+  {
+   strcpy (cmdsh,"$");
+   free (bufferbatch);
+   return cmdsh;
+  }
+  file_offset += 2;
+
+  while ( result != 0)
+  {
+   fgets (cmdsh);
+   result--;
+  }
+
+  free (bufferbatch);
+  return cmdsh;
+ }
+
+
+void FullScreenShell (void)
+{
+ InitFullApp ();
+ asm {
+	mov ah,3
+	mov al,0
+	int 0x46
+	mov ax,3
+	int 0x10
+     }
+ shell = get_shell ();
+ shell ();
+ _DS = _CS;
+ if (gmode == 1)
+  init640480 ();
+ else
+  init800600 ();
+ SetRGB (1,Pal[0],Pal[1],Pal[2]);
+ SetRGB (3,Pal[3],Pal[4],Pal[5]);
+  asm {
+	mov ah,3
+	mov al,1
+	mov bx,cs
+	mov cx,offset SysBuf
+	int 0x46
+     }
+ CloseFullApp ();
+
+}
+
+void far (*reboot) (void) = 0xffff0000;
+
+char fileS [24];
+char resultS [24];
+
+void TickMenu (void)
+{
+ if (is_full_app) return;
+
+ strcpy (fileS,"/etc/qwin.rc");
+ OtherMenu:
+
+ strcpy (resultS,script (fileS));
+ if (resultS [0] == '$') return;
+ if (resultS [0] == '@') exec (resultS+1,0,0);
+ if (resultS [0] == '*') CommandTerm (resultS+1,0);
+ if (resultS [0] == '~') CommandTerm (resultS+1,1);
+ if (resultS [0] == '&')
+ {
+  if (!strcmp (resultS+1,"quit")) quit = 1;
+  if (!strcmp (resultS+1,"clean")) DestroyAllWindows ();
+  if (!strcmp (resultS+1,"halt"))
+  {
+    halt ();
+  }
+  if (!strcmp (resultS+1,"term")) console ();
+  if (!strcmp (resultS+1,"fterm")) FullScreenShell ();
+  if (!strcmp (resultS+1,"vlock")) VideoLock ();
+  if (!strcmp (resultS+1,"reboot")) reboot ();
+  if (!strcmp (resultS+1,"about")) About ();
+  if (!strcmp (resultS+1,"mem")) ShowMem ();
+ }
+ if (resultS [0] == '#') { strcpy (fileS,resultS+1); goto OtherMenu; }
+}
+
+
+handle fntfile;
+handle palfile;
+
+// handle tempFile;
+
+unsigned char logonok (void)
+{
+ asm {
+       push es
+       mov ax,0x1000
+       mov es,ax
+       mov al,es:[0]
+       pop es
+     }
+}
+
+unsigned char get_mode (void)
+{
+ asm {
+ mov ah,9
+ int 46h
+ }
+}
+
+void StartProgram ()
+{
+
+ asm {
+	mov ah,3
+	mov al,1
+	mov bx,cs
+	mov cx,offset SysBuf
+	int 0x46
+     }
+
+ 
+ gmode = get_mode ();
+  if (gmode == 1)
+   init640480 ();
+  else 
+   init800600 ();
+
+// pic ("/qwin/boot.fig",140);
+
+ font_mem = malloc (768);
+ fntfile = fopen ("/lib/fnt/breeze.fnt");
+ fread (fntfile, 4096, 0, font_mem);
+ fntfile = fopen ("/lib/fnt/modern.fnt");
+ fread (fntfile, 4096, (void*)4096, font_mem);
+ fntfile = fopen ("/lib/fnt/roman.fnt");
+ fread (fntfile, 4096, (void*)8192, font_mem);
+ palfile = fopen ("/qwin/win.pal");
+ fread (palfile,6,&Pal,_CS);
+
+ isFont = 1;
+ is_full_app = 0;
+ setFont (0);
+ Pa = 0;
+
+ SetRGB (1,Pal[0],Pal[1],Pal[2]);
+
+/*
+ OutTextXY (30,450,"Input device: keyboard");
+ if (ismouse () == 0xffff)
+ {
+  OutTextXY (30+(22*8),450,", mouse");
+ }
+*/
+ //while ( !is_key () && (bmouse () != 1) );
+
+ SetVideo (OFF);
+ Background (1);
+
+ SetVideo (ON);
+
+ intr ((void*)&Int48,0x48);
+ activeButton = (CONTROL)0;
+ activeEditBox = (CONTROL)0;
+
+ HiMemoryInit ();
+
+ palfile = fopen ("/qwin/qwin.ini");
+ if (palfile < 2) return;
+ bufferbatch = malloc ( (fsize (palfile) / 16) + 1);
+ if (!bufferbatch) return;
+ fread (palfile,fsize (palfile),0,bufferbatch);
+ file_offset = 0;
+
+ cmdsh [0] = '\0' ;
+ while (cmdsh [0] != '>' )
+ {
+  fgets (cmdsh);
+  exec (cmdsh,0,0);
+ }
+
+ free (bufferbatch);
+
+/*
+ exec ("/qwin/int",0,0);
+
+ exec ("/qwin/logon",0,0);
+*/
+
+ mx = 0;
+ my = 0;
+
+ if (ismouse () == 0xffff)
+ {
+  mouse_status = 1;
+  if (gmode == 1)
+   init_mouse (640,480);
+  else
+  init_mouse (800,600);
+ }
+
+ SetRGB (3,Pal[3],Pal[4],Pal[5]);
+
+ setFont (0);
+
+ WindowManager ();
+
+ shut ();
+// end session
+
+ if (ismouse () == 0xffff) shut_mouse ();
+
+ asm {
+	mov ah,5
+	int 0x46
+     }
+
+ asm {
+	mov ah,3
+	mov al,0
+	int 0x46
+	mov ah,7
+	int 0x46
+	mov ax,3
+	int 0x10
+     }
+
+ free (font_mem);
+ protectedWnd = (HWND)0;
+ DestroyAllWindows ();
+ free (_CS);
+}
+
+

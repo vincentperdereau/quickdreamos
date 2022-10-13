@@ -1,0 +1,77 @@
+#include "quickwin.h"
+#include "typedef.h"
+#include "disk.h"
+
+HWND MyWindow;
+
+void far WinMain (void)
+{
+ FuncEntry
+
+  if (WM_MESSAGE == WINDOW_DESTROY)
+  {
+   close
+  }
+ FuncEnd
+}
+
+unsigned char acdisk (void)
+{
+ asm {
+	push es
+	mov ax,0x7c0
+	mov es,ax
+	mov al,es:[509]
+	pop es
+     }
+}
+
+unsigned long i,j;
+
+unsigne char drive;
+unsigned long total_size;
+unsigned long b,c,d,e;
+int quit=0;
+ulong total_size=0;
+unsigned char bitmap[512];
+unsigned int adr=0;
+
+void StartProgram ()
+{
+
+ MyWindow = CreateWindow (120,120,180,40,"Disk size",&WinMain);
+ SetColor (8);
+ Bar (135,140,285,150);
+ SetColor (1);
+
+// *******************************************
+
+ drive = acdisk ();
+ i = (get_head (drive)+1) * (get_cyl (drive)+1) * (get_sector (drive)) >> 11);
+ i = i * 1024 * 1024 ;
+ total_size = 0;
+ e = (((get_head (drive)+1) * (get_cyl (drive)+1)*(get_sector (drive))-219) >> 3);
+ e = (e>>9);
+ if (!e) e++;
+ for (b=219;(b<(e+219));b++)
+ {
+  fcb_dir (b,&bitmap);
+  for (d=0;d<=511;d++)
+  {
+   for (c=0;c<=7;c++)
+   {
+    if ( bitmap[d] & (1<<c) )
+    {
+     total_size++;
+    }
+   adr++;
+   }
+  }
+ }
+ j = adr * 512;
+
+// *******************************************
+
+ Bar (135,140, ,150);
+ SetColor (7);
+}

@@ -1,0 +1,46 @@
+# QuickDreamOS Makefile
+# release .1
+
+PROJECT = QuickDreamOS
+CC      = bcc
+LD      = tlink
+AS      = tasm
+BIN     = exe2bin
+ARGK    = +kernel.cfg
+ARGM    = +modules.cfg
+RM      = del
+#BUFFER = -DNO_BUFFER
+BUFFER  = -DBUFFER
+
+.PRECIOUS = main.c
+
+all: quick clean
+
+quick:
+ $(CC) $(ARGK) ./modules/entry.c
+ $(AS) entry.asm 01.obj
+ $(CC) $(ARGM) -o02.obj ./modules/string.c
+ $(CC) $(ARGM) -o03.obj ./modules/sys/mm/memory.c
+ $(CC) $(ARGK) $(BUFFER) ./modules/sys/disk/disk.c
+ $(AS) disk.asm 04.obj
+ $(CC) $(ARGM) -o05.obj ./modules/sys/fs/tinyfs/init.c
+ $(CC) $(ARGM) -o06.obj ./modules/sys/fs/tinyfs/bitmap.c
+ $(CC) $(ARGM) -o07.obj ./modules/sys/fs/tinyfs/fcb2.c
+ $(CC) $(ARGM) -o08.obj ./modules/sys/fs/tinyfs/create.c
+ $(CC) $(ARGM) -o09.obj ./modules/sys/fs/tinyfs/path.c
+ $(CC) $(ARGM) -o10.obj ./modules/sys/fs/tinyfs/file.c
+ $(CC) $(ARGM) -o11.obj ./modules/sys/fs/tinyfs/dir.c
+ $(CC) $(ARGM) -o12.obj ./modules/sys/intr/intr.c
+ $(CC) $(ARGK) ./modules/sys/krnbox/krnbox.c
+ $(AS) krnbox.asm 13.obj
+ $(CC) $(ARGK) $(BUFFER) main.c
+ $(AS) main.asm 14.obj
+ $(LD) 01.obj 02.obj 03.obj 04.obj 05.obj 06.obj 07.obj 08.obj 09.obj \
+       10.obj 11.obj 12.obj 13.obj 14.obj
+ $(BIN) 01.exe quick.bin
+
+clean:
+        $(RM) *.asm
+        $(RM) *.map
+        $(RM) *.obj
+        $(RM) *.exe

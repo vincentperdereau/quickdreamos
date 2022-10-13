@@ -1,0 +1,11 @@
+
+ Start  Stop   Length Name               Class
+
+ 00000H 00000H 00000H _TEXT              CODE
+ 00000H 00002H 00003H VP                 CODE
+ 00004H 00004H 00000H _DATA              DATA
+
+Error: Undefined symbol _MAIN in module ENTRY.ASM
+Program entry point at 0000:0000
+Warning: No stack
+

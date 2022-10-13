@@ -1,0 +1,29 @@
+.line
+ * FUNCTION:    Get System Information
+   NUMBER:      0019h
+   ENTRY:       none
+   RETURN:      2000h:si = Pointer to system block
+                system block
+                 processor DB  ; 3/4/5 86
+                 himemKB   DW  ; extended memory
+                 is_mmx    DB  ; 1 for yes
+                 is_fpu    DB  ; 1 for yes
+                 is_vesa   DB  ; 1 for yes
+                 sc_port   DW  ; sound card port
+.line
+ * FUNCTION:    HI-Memory allocation
+   NUMBER:      0020h
+   ENTRY:       ecx = number of bytes
+   RETURN:      ebx = pointer ( fs:ebx )
+.line
+ * FUNCTION:    HI-Memory release
+   NUMBER:      0021h
+   ENTRY:       ecx = number of bytes
+   RETURN:      none
+.line
+.link
+main
+./prog/index.qdl
+.link
+previous
+./prog/api6.qdl

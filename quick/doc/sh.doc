@@ -1,0 +1,34 @@
+sh.bin
+ÄÄÄÄÄÄ
+
+# execution de programmes:
+ - dans le repertoire courant: ./nom_du_prog
+ - dans le path: nom_du_prog
+
+# execution de script:
+ ~nom_du_script
+ (ex: ~install)
+
+# terminer un programme: touche F12
+
+# syntaxe des commandes:
+
+Commande        Syntaxe                         Exemple
+
+cp              cp file_src file_dst            cp /etc/script /script    
+mkdir           mkdir rep_a_creer               mkdir tmp
+rmdir           rmdir rep_a_detruire            rmdir tmp
+cd              cd rep_dst                      cd ..
+rem             rem commentaire                 rem fichier init
+#               # commentaire                   # fichier init
+color           color on/off                    color on
+size            size fichier                    size /init
+chmod           chmod attribut fichier          chmox x tst.bin
+clear           [efface l'‚cran]                clear
+on              [equivaut … echo on]            on
+off             [equivaut … echo off]           off
+echo            echo message                    echo D‚marrage du systŠme
+c:                                              c:
+a:                                              a:
+pause                                           pause
+exit            exit                            exit

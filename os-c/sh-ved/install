@@ -1,0 +1,45 @@
+clear
+off
+echo [*] Making File-System
+mkfs c
+echo [*] Copying kernel sectors
+sys c
+echo [*] Copying system files
+cp a:/init c:/init
+cp a:/sh c:/sh
+echo [*] Making directory system
+c:
+mkdir etc
+mkdir bin
+mkdir home
+mkdir dev
+mkdir doc
+mkdir lib
+mkdir /lib/fnt
+a:
+echo [*] Copying binaries program
+cp a:/etc/init.rc c:/etc/init.rc
+cp a:/etc/shut.rc c:/etc/shut.rc
+cp a:/bin/ved c:/bin/ved
+cp a:/bin/debugfs c:/bin/debugfs
+cp a:/bin/pshot c:/bin/pshot
+cp a:/bin/as c:/bin/as
+cp a:/dev/cua0 c:/dev/cua0
+cp a:/doc/api.doc c:/doc/api.doc
+cp a:/doc/sh.doc c:/doc/sh.doc
+cp a:/doc/as.doc c:/doc/as.doc
+# cp a:/lib/fnt/antique c:/lib/fnt/antique
+# cp a:/lib/fnt/courier c:/lib/fnt/courier
+# cp a:/lib/fnt/script c:/lib/fnt/script
+# cp a:/lib/fnt/medieval c:/lib/fnt/medieval
+cp a:/lib/shut.bmp c:/lib/shut.bmp
+chmod x c:/bin/ved
+chmod x c:/bin/as
+chmod x c:/bin/pshot
+chmod x c:/bin/debugfs
+chmod s c:/etc/init.rc
+chmod s c:/etc/shut.rc
+chmod x c:/sh
+chmod x c:/init
+echo [*] Installation successfully finished.
+on

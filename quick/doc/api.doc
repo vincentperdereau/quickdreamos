@@ -1,0 +1,151 @@
+
+; ÚÄÄÄÄÄÄÄÄÄÄÂÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ¿
+; ³  API.DOC ³                                                           ³
+; ÃÄÄÄÄÄÄÄÄÄÄÙ                                                           ³
+; ³                Application Programming Interface                     ³
+; ³                                                                      ³
+; ³                                                                Alpha ³
+; ÀÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÙ
+
+   AH has number function. Interruption x44
+
+=============================================================================
+ * FUNCTION:    Open A File
+   NUMBER:      0002h
+   ENTRY:       DS:SI = Pointer to an asciiz file name
+   RETURN:      EAX = handle, if (eax < 2) => error
+=============================================================================
+ * FUNCTION:    Create a file
+   NUMBER:      0003h
+   ENTRY:       DS:SI = pointer to an asciiz file name
+   RETURN:      EAX = handle, if (eax < 2) => error
+=============================================================================
+ * FUNCTION:    Read into a file
+   NUMBER:      0004h
+   ENTRY:       EDX = handle
+                ECX = number of byte wanted
+                ES:DI = buffer
+   RETURN:      0 = Ok , else error
+=============================================================================
+ * FUNCTION:    Write into a file        
+   NUMBER:      0005h
+   ENTRY:       EDX = handle
+                ECX = number of byte
+                DS:SI = buffer
+   RETURN:      0 = Ok, else error
+=============================================================================
+ * FUNCTION:    Change actual drive
+   NUMBER:      0006h
+   ENTRY:       AL = drive (0=a: 0x80=c:)
+   RETURN:      AL = 1 if Ok, else 0
+=============================================================================
+ * FUNCTION:    Change actual directory
+   NUMBER:      0007h
+   ENTRY:       DS:SI = asciiz dir name (must '/.' terminated)
+   RETURN:      eax = code dir, ( if 0xffffffff => error)
+=============================================================================
+ * FUNCTION:    Create a new directory
+   NUMBER:      0008h
+   ENTRY:       DS:SI = pointer to an asciiz dir name
+   RETURN:      AL = 1, else error
+=============================================================================
+ * FUNCTION:    Listing File
+   NUMBER:      0009h
+   ENTRY:       EDX = cluster
+                ES:DI = pointer to a buffer
+   RETURN:      AL = 1 if Ok, else 0        
+=============================================================================
+ * FUNCTION:    Get FCB Number of actual disk
+   NUMBER:      000Bh
+   ENTRY:       none
+   RETURN:      eax = fcb count
+=============================================================================
+ * FUNCTION:    File size
+   NUMBER:      000Ch
+   ENTRY:       EDX = file handle
+   RETURN:      ECX = size (byte)
+=============================================================================
+ * FUNCTION:    Remove a file
+   NUMBER:      000Dh
+   ENTRY:       EDX = handle
+   RETURN:      AL = 1 if ok, else 0
+=============================================================================
+ * FUNCTION:    Remove an empty directory (MUST BE EMPTY)
+   NUMBER:      000Eh
+   ENTRY:       DS:SI = asciiz dir name
+   RETURN:      al = 1 if Ok, else 0
+=============================================================================
+ * FUNCTION:    Retry actual dir code
+   NUMBER:      000Fh
+   ENTRY:       none
+   RETURN:      eax = actual dir code, (0xffffffff => error)
+=============================================================================
+ * FUNCTION:    Write string
+   NUMBER:      0010h
+   ENTRY:       DS:SI = asciiz pointer
+   RETURN:      none
+=============================================================================
+ * FUNCTION:    Read a line
+   NUMBER:      0011h
+   ENTRY:       ES:BX = buffer
+                CX = characters count wanted
+   RETURN:      ES:BX = asciiz 
+=============================================================================
+ * FUNCTION:    Memory Allocation
+   NUMBER:      0012h
+   ENTRY:       BX = paragraph (16 bytes)
+   RETURN:      AX:0 = area reserved (segment)
+=============================================================================
+ * FUNCTION:    Memory Release
+   NUMBER:      0013h
+   ENTRY:       BX = segment
+   RETURN:      none
+=============================================================================
+ * FUNCTION:    Exec
+   NUMBER:      0014h
+   ENTRY:       DS:SI = asciiz file name
+   RETURN:      none
+=============================================================================
+ * FUNCTION:    Memory Used
+   NUMBER:      0015h
+   ENTRY:       none
+   RETURN:      AX = paragraph used
+=============================================================================
+ * FUNCTION:    Get Log Name
+   NUMBER:      0016h
+   ENTRY:       none
+   RETURN:      DS:SI = asciiz name
+=============================================================================
+ * FUNCTION:    File Set Attribut
+   NUMBER:      0017h
+   ENTRY:       EDX = file handle
+                CL = attribut
+   RETURN:      AX = 1 if good, else 0
+=============================================================================
+ * FUNCTION:    Read a key 
+   NUMBER:      0018h
+   ENTRY:       none
+   RETURN:      AL=character
+=============================================================================
+ * FUNCTION:    Get System Information
+   NUMBER:      0019h
+   ENTRY:       none
+   RETURN:      2000h:si = Pointer to system block
+                system block
+                 processor DB  ; 3/4/5 86
+                 himemKB   DW  ; extended memory
+                 is_mmx    DB  ; 1 for yes
+                 is_fpu    DB  ; 1 for yes
+                 is_vesa   DB  ; 1 for yes
+                 sc_port   DW  ; sound card port
+=============================================================================
+ * FUNCTION:    HI-Memory allocation
+   NUMBER:      0020h
+   ENTRY:       ecx = number of bytes
+   RETURN:      ebx = pointer ( fs:ebx )
+=============================================================================
+ * FUNCTION:    HI-Memory release
+   NUMBER:      0021h
+   ENTRY:       ecx = number of bytes
+   RETURN:      none
+=============================================================================

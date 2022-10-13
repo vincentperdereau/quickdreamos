@@ -1,0 +1,28 @@
+Changes
+-------
+01.08.2000   Fixed the keymap support. Now all keys are possible to use.
+             Changed FUNCTION$API$INKEY: again to fully support special keys
+             which are pressed with AltGr+key.
+             Changed format of keymap.
+             Added support for British and U.S. keyboards.
+             The British and U.S. keymap is based on a description which
+             i found in the book "The undocumented PC"
+             Removed the keyboard$ and keymapfile lines in Init.ASM.
+             The keyboard$ and kaymapfile lines are now defined in keydrv.asm
+             Added a defination of the keymap format into the keymap files
+             Added in Init.ASM a new line (include driver.asm) for CS4235 support.
+             Changed the position of the include keydrv.asm. Now it is where
+             the load_shell label is. This was needed because when a soundcard
+             is found the keydrv.asm routine was ignored.
+
+30.7.2000    First try of keymap support. Not all keys are working.
+             Added  include keydrv.asm
+             Changed FUNCTION$API$INKEY: routine to support loadable keymaps
+             Renamed FrenchKeymap to Keymap.
+             Added a name and a number of key line to the keymap 
+             French.Asm is the driver file for french keyboards
+             German.Asm is the driver file for german keyboards
+             Added this two lines at the end of Init.ASM
+              keyboard$              DB      LF,CR,"keyboard:",0
+              keymapfile             DB      "/lib/kbd/keymap",0
+

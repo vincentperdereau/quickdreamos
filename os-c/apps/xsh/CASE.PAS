@@ -1,0 +1,743 @@
+Uses Graph , crt ;
+
+Var Tmp_S : String;
+Var Tmp_B : Byte ;
+Var BackColor : Byte ;
+Var St : String[100] ;
+
+Procedure MakeSourceFile ;forward ;
+
+Procedure AssignArea(X,Y,Long,Larg:Word;Labl:String;Color:Byte);
+Begin
+SetColor(8);
+Line(X,Y,X+Long,Y);
+SetColor(15);
+Line(X,Y+1,X+Long,Y+1);
+SetColor(8);
+line(X,Y+Larg,X+Long,Y+Larg);
+SetColor(15);
+Line(X,Y+Larg+1,X+Long,Y+Larg+1);
+setColor(8);
+Line(X,Y,X,Y+Larg);
+setCOlor(15);
+Line(X+1,Y+1,X+1,Y+Larg);
+Setcolor(8);
+Line(X+Long,Y,X+Long,Y+Larg);
+SetColor(15);
+Line(X+Long+1,Y,X+Long+1,Y+Larg);
+SetFillStyle(1,Color);
+Bar(X+10,Y-4,X+10+(Length(Labl)*8),Y+4);
+SetCOlor(0);
+OutTextXy(X+10,Y-2,Labl);
+End ;
+
+Procedure LowerArea(X,Y,Long,Larg:Word;Color:Byte);
+Begin
+SetFillStyle(1,Color);
+Bar(X,Y,X+Long,Y+Larg);
+SetColor(8);
+Line(X-2,Y-2,X+Long+1,Y-2);
+Line(X-2,Y-1,X+Long+2,Y-1);
+Line(X-2,Y-2,X-2,Y+Larg+2);
+Line(X-1,Y-1,X-1,Y+larg+1);
+SetColor(15);
+Line(X-2,Y+Larg+2,X+long+2,Y+Larg+2);
+Line(X-1,Y+larg+1,X+Long+2,Y+Larg+1);
+Line(X+Long+2,Y+Larg+1,X+Long+2,Y-2);
+Line(X+Long+1,Y+larg+1,X+Long+1,Y-1);
+End ;
+
+Procedure UpperArea(X,Y,Long,Larg:Word;Color:Byte);
+Begin
+SetFillStyle(1,Color);
+Bar(X,Y,X+Long,Y+Larg);
+SetColor(15);
+Line(X-2,Y-2,X+Long+1,Y-2);
+Line(X-2,Y-1,X+Long+2,Y-1);
+Line(X-2,Y-2,X-2,Y+Larg+2);
+Line(X-1,Y-1,X-1,Y+larg+1);
+SetColor(8);
+Line(X-2,Y+Larg+2,X+long+2,Y+Larg+2);
+Line(X-1,Y+larg+1,X+Long+2,Y+Larg+1);
+Line(X+Long+2,Y+Larg+1,X+Long+2,Y-2);
+Line(X+Long+1,Y+larg+1,X+Long+1,Y-1);
+End ;
+
+Procedure Window(X,Y,Long,Larg:Word;Color:Byte;Caption:String);
+Begin
+SetFillStyle(1,Color);
+Bar(X,Y,X+Long,Y+LArg);
+SetFillStyle(1,15);
+Bar(X,Y-17,X+Long,Y);
+SetColor(0);
+Rectangle(X-1,Y-18,X+Long+1,Y+Larg+1);
+Line(X-1,Y,X+Long+1,Y);
+Line(X+1,Y+2+LArg,X+Long+2,Y+2+Larg);
+Line(X+Long+2,Y-16,X+Long+2,Y+Larg+2);
+SetColor(7);
+Line(X,Y-15,X+Long,Y-15);
+Line(X,Y-13,X+Long,Y-13);
+Line(X,Y-11,X+Long,Y-11);
+Line(X,Y-9,X+Long,Y-9);
+Line(X,Y-7,X+Long,Y-7);
+Line(X,Y-5,X+Long,Y-5);
+Line(X,Y-3,X+Long,Y-3);
+SetColor(0);
+Line(X+10,Y-15,X+10,Y-4);
+Line(X+10,Y-15,X+22,Y-15);
+SetColor(15);
+Line(X+22,Y-15,X+22,Y-4);
+Line(X+10,Y-4,X+22,Y-4);
+SetFillStyle(1,15);
+Bar(X+11,Y-14,X+21,Y-4);
+SetFillStyle(1,7);
+Bar(X+12,Y-13,X+20,Y-5);
+SetCOlor(0);
+Line(X+20,Y-13,X+20,Y-5);
+Line(X+12,Y-5,X+20,Y-5);
+SetFillStyle(1,15);
+SetTextStyle(1,0,1);
+SetUserCharSize(1,2,1,2);
+Bar( X + Round( (Long)/2) - Round((TextWidth(Caption)+9)/2) , Y - 17 ,
+     X + Round( (Long)/2) + Round((TextWidth(Caption)+9)/2) , Y - 1);
+OutTextXy(X + Round( (Long)/2) - Round(TextWidth(Caption)/2),Y-19,Caption);
+SetTextStyle(0,0,1);
+End ;
+
+Procedure _button(Xbut,Ybut ,Xbut2,Ybut2: INTEGER ; caption: String);
+Begin
+setcolor(black);
+rectangle(Xbut,Ybut,Xbut2,Ybut2);
+setfillstyle(1,7);
+bar(Xbut+1,Ybut+1,Xbut2-1,Ybut2-1);
+setcolor(white);
+line(Xbut+1,Ybut+1,Xbut2-1,Ybut+1);
+line(Xbut+1,Ybut+1,Xbut+1,Ybut2-1);
+setcolor(8);
+line(Xbut+1,Ybut2-1,Xbut2-1,Ybut2-1);
+line(Xbut2-1,Ybut+1,XBut2-1,Ybut2-1);
+settextstyle(defaultfont,horizdir,1);
+setcolor(0);
+outtextXY(Xbut+3+round((xbut2-xbut-textwidth(caption)) div 2),((Ybut+Ybut2) div 2)-3,caption);
+end;
+
+Function Read_key : Char ;
+Begin
+Asm
+Mov Ah , 00
+Int 16h
+Mov TMP_B , Al
+End ;
+Read_Key := Chr(TMP_B);
+End ;
+
+Procedure CB(x,y,long:integer);
+Begin
+SetFillStyle(1,15);Bar(x+1,y+1,x+long+3-1,y+19);
+end;
+
+Function Input_box(x,y,long:integer) : String ;
+Var C : Char ;
+Begin
+TMP_S := '';
+SetFillStyle(1,15);Bar(x,y,x+long+3,y+20);
+setcolor(0);line(x,y-1,x+long+3,y-1);line(x-1,y-1,x-1,y+20);
+Setcolor(7);line(x,y,x+long+3,y);line(x,y,x,y+20);
+setcolor(8);line(x,y+20,x+long+3,y+20);line(x+long+3,y,x+long+3,y+20);
+Setcolor(black);
+Repeat
+Cb(x,y,long);OuttextXY(x+2,y+8,TMP_S+'_');
+   C := Read_Key ;
+if (ord(c)>33)and(ord(c)<126) then Begin
+   Tmp_S := tmp_s+c;
+   end;
+if c = chr(32) then Begin Tmp_S := Tmp_S+' ' end;
+if c = chr(8) then BEgin delete(Tmp_S,length(Tmp_S),1) end;
+if length(Tmp_S) = (long div 8) then Begin delete(Tmp_S,length(Tmp_S),1) end;
+Until (C = Chr(27)) xor (c=chr(13));
+Cb(x,y,long);OuttextXY(x+2,y+8,Tmp_S);
+Input_box := Tmp_S;
+end;
+
+Procedure ShowMouse ; Assembler ;
+Asm Mov Ax , 0001 ; Int 33h End ;
+
+Procedure HideMouse ; Assembler ;
+Asm Mov Ax , 0002 ; Int 33h End ;
+
+Procedure gauge ( X , Y , Long , larg : Word ; BackColor , ForeColor :Byte);
+Begin
+HideMouse ;
+SetFillStyle(1,BackColor);
+Bar(X,Y,X+Long,Y+Larg);
+SetColor(8);
+Line(X-2,Y-2,X+Long+1,Y-2);
+Line(X-2,Y-1,X+Long+2,Y-1);
+Line(X-2,Y-2,X-2,Y+Larg+2);
+Line(X-1,Y-1,X-1,Y+larg+1);
+SetColor(15);
+Line(X-2,Y+Larg+2,X+long+2,Y+Larg+2);
+Line(X-1,Y+larg+1,X+Long+2,Y+Larg+1);
+Line(X+Long+2,Y+Larg+1,X+Long+2,Y-2);
+Line(X+Long+1,Y+larg+1,X+Long+1,Y-1);
+ShowMouse ;
+End ;
+Procedure Bar_3d(X,Y,Long,Larg:Integer;color:byte);
+Begin
+SetFillStyle(1,color);
+bar(X,Y,X+Long,Y+Larg);
+Setcolor(15);
+Line(X,Y-1,X+Long,Y-1);
+Line(X,Y,X+Long-1,Y);
+Line(X-1,Y-1,X-1,Y+Larg);
+Line(X,Y,X,Y+Larg-1);
+Setcolor(0);
+Line(X,Y+Larg,X+Long,Y+Larg);
+Line(X+Long+1,Y,X+Long+1,Y+Larg);
+Setcolor(8);
+Line(X+1,Y+Larg-1,X+Long,Y+Larg-1);
+Line(X+Long,Y,X+Long,Y+Larg-1);
+End;
+
+Function PopupMenu( X , Y , Long : Word ; Nb : Byte ; Tab : Pointer ) : Byte ;
+Var Xs , Ys , Bouton : Word ;
+Var AreaSize         : Word ;
+Var AreaPointer      : Pointer ;
+Type Buf = Array[1..25] Of String ;
+Var Buffer           : ^Buf ;
+Var Choix            : Byte ;
+Begin
+Asm
+xor ah , ah
+mov choix , ah
+End ;
+HideMouse ;
+AreaSize := ImageSize(X-2,Y-2,X+Long+2,y+Nb*17+2);
+GetMem( AreaPointer , AreaSize );
+GetImage(x-2,y-2,x+long+2,y+Nb*17+2,AreaPointer^);
+Bar_3D(X,Y,Long,Nb*17,7);
+Buffer := Ptr(Seg(Tab^),Ofs(Tab^));
+SetColor(0);SetTextStyle(SmallFont,HorizDir,5);
+For TMP_B := 1 To Nb Do Begin
+If Buffer^[TMP_B] = '-' Then Begin
+SetColor(15);Line(X+3,Y+(TMP_B*15)-3,X+long-2,Y+(TMP_B*15)-3);
+SetColor(8);Line(X+3,Y+(TMP_B*15)-4,X+long-2,Y+(TMP_B*15)-4);SetColor(0);end
+else OutTextXY(X+8,Y+(TMP_B*15)-12,Buffer^[TMP_B]);
+End ;
+ShowMouse ;
+Repeat
+Asm Mov Ax , 03 ; int 33h ; Mov Xs , Cx ; Mov Ys , Dx ; Mov Bouton , Bx ; End ;
+Choix := 0 ;
+For TMp_B := 1 To Nb do
+If (Xs>X)and(Ys>Y+(TMP_B*15)-12)and(Xs<X+Long)and(Ys<Y+(TMP_B*15)+3)and(not(Buffer^[TMP_B]='-')) Then
+BEgin
+Choix := TMP_B ;
+SetFillStyle(1,1);SetColor(15);
+HideMouse ;
+Bar(X+1,Y+(TMP_B*15)-12,X+Long-1,Y+(TMP_B*15)+3);
+OutTextXY(X+8,Y+(TMP_B*15)-12,Buffer^[TMP_B]);
+ShowMouse ;
+Repeat
+Asm Mov Ax , 03 ; Int 33h ; Mov Xs , Dx ; Mov Ys , Bx End ;
+Until (not( (xs>Y+(TMP_B*15)-12)and(xs<Y+(TMP_B*15)+3))) xor (ys=0) ;
+SetFillStyle(1,7);SetColor(0);
+HideMouse ;
+Bar(X+1,Y+(TMP_B*15)-12,X+Long-1,Y+(TMP_B*15)+3);
+OutTextXY(X+8,Y+(TMP_B*15)-12,Buffer^[TMP_B]);
+ShowMouse ;
+End ;
+Until Bouton=0 ;
+SetTextStyle(DefaultFont,HorizDir,1);
+PopupMenu := Choix ;
+HideMouse ;
+PutImage(x-2,y-2,AreaPointer^,NormalPut);
+FreeMem( AreaPointer , AreaSize );
+ShowMouse ;
+End ;
+
+type btns = record
+x , y ,x2,y2: word ;
+caption : string ;
+end ;
+
+type edits = record
+x , y : word ;
+car : byte ;
+end ;
+
+type titles = record
+x , y : word ;
+caption : string ;
+color : byte ;
+end ;
+
+type boxes = record
+x , y , long , larg : Word ;
+caption : string ;
+end ;
+
+type upp = record
+x , y , long , larg : word ;
+color : byte ;
+end ;
+
+type tab = array[1..5] of string ;
+
+Var Driver , Mode : Integer ;
+Var btn : array[1..10] Of Btns ;
+Var edit : array[1..10] Of edits ;
+Var Title : Array[1..10] Of titles ;
+Var box : array[1..15] of boxes ;
+Var up : array[1..15] Of Upp ;
+Var Lo : Array[1..15] of Upp ;
+Var Ga : Array[1..15] of Upp ;
+Var sX , sY , sB : Word ;
+Var oX , oy , ob : word ;
+var ptab : ^tab ;
+var b : byte ;
+var nb_b : byte ;
+var nb_e : byte ;
+var nb_t : byte ;
+var nb_bo : byte ;
+var nb_u : byte ;
+var nb_l : byte ;
+var nb_g : byte ;
+
+Procedure Menu ;
+Begin
+new (ptab);
+ptab^[1] := 'Make Source' ;
+ptab^[2] := '-' ;
+ptab^[3] := 'Exit';
+ptab^[4] := '-' ;
+ptab^[5] := 'About' ;
+b := popupmenu(3,43,100,5,ptab);
+dispose( ptab );
+if b = 1 then makesourcefile ;
+if b = 3 then Begin Closegraph ; halt(0); End ;
+If b = 5 Then Begin
+              Window(460,400,150,50,12,'About Case');
+              OutTextXY(480,415,'Case 1.00');
+              OutTextXy(480,435,'By ViP ');
+              End ;
+End ;
+
+Procedure Buttons ;
+begin
+nb_b := nb_b + 1 ;
+hidemouse ;
+window(10,400,400,60,7,'Button Label');
+btn[nb_b].caption := input_box(15,420,300);
+setfillstyle(1,7);
+bar(400,300,540,350);
+setcolor(0);
+outtextXy(450,320,'Buttons');
+setwritemode(xorput);
+delay(100);
+repeat
+setcolor( 15 );
+asm mov ax , 3 ; int 33h ; mov ox , cx ; mov oy , dx ; mov ob , bx end ;
+line(ox-5,oy,ox+5,oy);
+line(ox,oy-5,ox,oy+5);
+delay(10);
+line(ox-5,oy,ox+5,oy);
+line(ox,oy-5,ox,oy+5);
+if ( ob = 1 ) Then Begin
+                   Repeat
+                   asm mov ax , 3 ; int 33h ; mov sx , cx ; mov sy , dx ; mov sb , bx end ;
+                   rectangle(ox,oy,sx,sy);
+                   delay(5);
+                   rectangle(ox,oy,sx,sy);
+                   Until sb = 0 ;
+                   setwritemode(normalput);
+                   _Button(ox,oy,sx,sy,btn[nb_b].caption);
+                   btn[nb_b].x := ox ;
+                   btn[nb_b].y := oy ;
+                   btn[nb_b].x2 := sx ;
+                   btn[nb_b].y2 := sy ;
+                   showmouse ;
+                   exit ;
+                   end ;
+
+until false ;
+end ;
+
+Procedure Upper  ;
+var s: string ;
+begin
+nb_u := nb_u + 1 ;
+hidemouse ;
+window(10,400,400,60,7,'Upper Color');
+s := input_box(15,420,300);
+up[nb_u].color := ord(s[1])-48 ;
+setfillstyle(1,7);
+bar(400,300,540,350);
+setcolor(0);
+outtextXy(450,320,'UpperArea');
+setwritemode(xorput);
+delay(100);
+repeat
+setcolor( 15 );
+asm mov ax , 3 ; int 33h ; mov ox , cx ; mov oy , dx ; mov ob , bx end ;
+line(ox-5,oy,ox+5,oy);
+line(ox,oy-5,ox,oy+5);
+delay(10);
+line(ox-5,oy,ox+5,oy);
+line(ox,oy-5,ox,oy+5);
+if ( ob = 1 ) Then Begin
+                   Repeat
+                   asm mov ax , 3 ; int 33h ; mov sx , cx ; mov sy , dx ; mov sb , bx end ;
+                   rectangle(ox,oy,sx,sy);
+                   delay(5);
+                   rectangle(ox,oy,sx,sy);
+                   Until sb = 0 ;
+                   setwritemode(normalput);
+                   up[nb_u].x := ox ;
+                   up[nb_u].y := oy ;
+                   up[nb_u].long := Sx-Ox ;
+                   up[nb_u].larg := Sy-Oy ;
+                   UpperArea(Ox,Oy,Sx-Ox,Sy-Oy,up[nb_u].color);
+
+                   showmouse ;
+                   exit ;
+                   end ;
+
+until false ;
+end ;
+
+Procedure Lower  ;
+var s: string ;
+begin
+nb_l := nb_l + 1 ;
+hidemouse ;
+window(10,400,400,60,7,'Lower Color');
+s := input_box(15,420,300);
+lo[nb_l].color := ord(s[1])-48 ;
+setfillstyle(1,7);
+bar(400,300,540,350);
+setcolor(0);
+outtextXy(450,320,'LowerArea');
+setwritemode(xorput);
+delay(100);
+repeat
+setcolor( 15 );
+asm mov ax , 3 ; int 33h ; mov ox , cx ; mov oy , dx ; mov ob , bx end ;
+line(ox-5,oy,ox+5,oy);
+line(ox,oy-5,ox,oy+5);
+delay(10);
+line(ox-5,oy,ox+5,oy);
+line(ox,oy-5,ox,oy+5);
+if ( ob = 1 ) Then Begin
+                   Repeat
+                   asm mov ax , 3 ; int 33h ; mov sx , cx ; mov sy , dx ; mov sb , bx end ;
+                   rectangle(ox,oy,sx,sy);
+                   delay(5);
+                   rectangle(ox,oy,sx,sy);
+                   Until sb = 0 ;
+                   setwritemode(normalput);
+                   lo[nb_l].x := ox ;
+                   lo[nb_l].y := oy ;
+                   lo[nb_l].long := Sx-Ox ;
+                   lo[nb_l].larg := Sy-Oy ;
+                   LowerArea(Ox,Oy,Sx-Ox,Sy-Oy,lo[nb_l].color);
+                   showmouse ;
+                   exit ;
+                   end ;
+
+until false ;
+end ;
+
+Procedure Gauger  ;
+var s: string ;
+begin
+nb_g := nb_g + 1 ;
+hidemouse ;
+window(10,400,400,60,7,'Gauge Back Color');
+s := input_box(15,420,300);
+ga[nb_g].color := ord(s[1])-48 ;
+setfillstyle(1,7);
+bar(400,300,540,350);
+setcolor(0);
+outtextXy(450,320,'Gauge');
+setwritemode(xorput);
+delay(100);
+repeat
+setcolor( 15 );
+asm mov ax , 3 ; int 33h ; mov ox , cx ; mov oy , dx ; mov ob , bx end ;
+line(ox-5,oy,ox+5,oy);
+line(ox,oy-5,ox,oy+5);
+delay(10);
+line(ox-5,oy,ox+5,oy);
+line(ox,oy-5,ox,oy+5);
+if ( ob = 1 ) Then Begin
+                   Repeat
+                   asm mov ax , 3 ; int 33h ; mov sx , cx ; mov sy , dx ; mov sb , bx end ;
+                   rectangle(ox,oy,sx,sy);
+                   delay(5);
+                   rectangle(ox,oy,sx,sy);
+                   Until sb = 0 ;
+                   setwritemode(normalput);
+                   ga[nb_l].x := ox ;
+                   ga[nb_l].y := oy ;
+                   ga[nb_l].long := Sx-Ox ;
+                   ga[nb_l].larg := Sy-Oy ;
+                   Gauge(Ox,Oy,Sx-Ox,Sy-Oy,ga[nb_g].color,1);
+                   showmouse ;
+                   exit ;
+                   end ;
+
+until false ;
+end ;
+
+Procedure Boxs ;
+var s : string ;
+begin
+nb_bo := nb_bo + 1 ;
+hidemouse ;
+window(10,400,400,60,7,'Box label');
+box[nb_bo].caption := input_box(15,420,300);
+setfillstyle(1,7);
+bar(400,300,540,350);
+setcolor(0);
+outtextXy(450,320,'Box');
+setwritemode(xorput);
+delay(100);
+repeat
+setcolor( 15 );
+asm mov ax , 3 ; int 33h ; mov ox , cx ; mov oy , dx ; mov ob , bx end ;
+line(ox-5,oy,ox+5,oy);
+line(ox,oy-5,ox,oy+5);
+delay(10);
+line(ox-5,oy,ox+5,oy);
+line(ox,oy-5,ox,oy+5);
+if ( ob = 1 ) Then Begin
+                   Repeat
+                   asm mov ax , 3 ; int 33h ; mov sx , cx ; mov sy , dx ; mov sb , bx end ;
+                   rectangle(ox,oy,sx,sy);
+                   delay(5);
+                   rectangle(ox,oy,sx,sy);
+                   Until sb = 0 ;
+                   setwritemode(normalput);
+                   AssignArea(ox,oy,sx-ox,sy-oy,box[nb_bo].caption,backcolor);
+                   box[nb_bo].x := ox ;
+                   box[nb_bo].y := oy ;
+                   box[nb_bo].long := sx-ox ;
+                   box[nb_bo].larg := sy-oy ;
+                   showmouse ;
+                   exit ;
+                   end ;
+
+until false ;
+end ;
+
+Procedure  editboxes;
+begin
+nb_e := nb_e + 1 ;
+hidemouse ;
+setfillstyle(1,7);
+bar(400,300,540,350);
+setcolor(0);
+outtextXy(450,320,'EditBoxes');
+setwritemode(xorput);
+delay(100);
+repeat
+setcolor( 15 );
+asm mov ax , 3 ; int 33h ; mov ox , cx ; mov oy , dx ; mov ob , bx end ;
+line(ox-5,oy,ox+5,oy);
+line(ox,oy-5,ox,oy+5);
+delay(10);
+line(ox-5,oy,ox+5,oy);
+line(ox,oy-5,ox,oy+5);
+if ( ob = 1 ) Then Begin
+                   Repeat
+                   asm mov ax , 3 ; int 33h ; mov sx , cx ; mov sy , dx ; mov sb , bx end ;
+                   rectangle(ox,oy,sx,oy+20);
+                   delay(5);
+                   rectangle(ox,oy,sx,oy+20);
+                   Until sb = 0 ;
+                   setwritemode(normalput);
+asm mov ah , 05h ; xor cx , cx ; mov ch , 1 ; mov cl , 27 ; int 16h end ;
+                   input_box(ox,oy,(sx-ox));
+                   edit[nb_e].x := ox ;
+                   edit[nb_e].y := oy ;
+                   edit[nb_e].car := round((sx-ox)/8)-1 ;
+                   showmouse ;
+                   exit ;
+                   end ;
+
+until false ;
+setwritemode(normalput);
+showmouse ;
+end ;
+
+Procedure _Titles ;
+var s: string ;
+begin
+nb_t := nb_t + 1 ;
+hidemouse ;
+window(10,400,400,60,7,'Title Label');
+title[nb_t].caption := input_box(15,420,300);
+title[nb_t].Color := 0;
+setfillstyle(1,7);
+bar(400,300,540,350);
+setcolor(0);
+outtextXy(450,320,'Title');
+setwritemode(xorput);
+delay(100);
+{settextstyle(1,0,1);
+setusercharsize(1,2,1,2);}
+repeat
+setcolor( 15 );
+asm mov ax , 3 ; int 33h ; mov ox , cx ; mov oy , dx ; mov ob , bx end ;
+rectangle(ox,oy,ox+textwidth(title[nb_t].caption),oy+textheight(title[nb_t].Caption));
+delay(10);
+rectangle(ox,oy,ox+textwidth(title[nb_t].caption),oy+textheight(title[nb_t].Caption));
+if ob = 1 then Begin
+               setwritemode(normalput);
+               setcolor( title[nb_t].color );
+               outtextxy(ox,oy,title[nb_t].caption);
+               title[nb_t].x := ox ;
+               title[nb_t].y := oy ;
+               setusercharsize(1,1,1,1);settextstyle(0,0,1);
+               showmouse ;
+               exit ;
+               end ;
+until 1=2 ;
+end ;
+
+var j : word ; b1 : word ;
+
+Procedure MakeSourceFile ;
+Var Fichier : Text ;
+Begin
+Assign(Fichier,'FORM1.C');
+ReWrite(Fichier);
+Writeln(Fichier,'// FORM1.C generated by case.exe  ');
+Writeln(Fichier,' ');
+Writeln(Fichier,'#include "quickwin.h"');
+Writeln(Fichier);
+For B := 1 to Nb_B Do
+Writeln(Fichier,'#define BUTTON_ID'+Chr(48+B)+' ',B,'');
+Writeln(Fichier,'// Variables ');
+Writeln(Fichier,'HWND FormWnd; ');
+For B := 1 To Nb_B do Begin
+Writeln(fichier,'char bCaption'+Chr(48+B)+' [] = "'+btn[b].caption+'";');
+end;
+For B := 1 To Nb_E Do
+Writeln(Fichier,'char eCaption',B,' [',edit[B].car,'] = {0,};');
+{
+For B := 1 To Nb_G Do
+Writeln(Fichier,'Var Gauge',B,' : Gauge ;');}
+Writeln(Fichier);
+Writeln (Fichier,'void far WinMain (void)');
+Writeln (Fichier,'{');
+Writeln (Fichier,' FuncEntry');
+Writeln (Fichier,'          ');
+Writeln (Fichier,'  if (WM_MESSAGE == WINDOW_DESTROY)');
+Writeln (Fichier,'  {');
+Writeln (Fichier,'   close');
+Writeln (Fichier,'  }');
+Writeln (Fichier,'  if (WM_MESSAGE == CONTROL_BUTTON)');
+Writeln (Fichier,'  {');
+For B := 1 To Nb_B Do Begin
+Writeln (fichier,'   if (WM_PARAM == BUTTON_ID'+Chr(48+B)+')');
+Writeln (fichier,'   {');
+Writeln (fichier,'   }');
+Writeln(fichier);
+End ;
+Writeln (Fichier,'  }');
+Writeln (Fichier,' FuncEnd');
+Writeln (fichier,'}');
+Writeln(fichier);
+Writeln(fichier,'void StartProgram ()');
+Writeln(fichier,'{');
+Writeln(fichier,' FormWnd = CreateWindow (155,150,350,250,"',st,'",&WinMain);');
+For B := 1 To Nb_B do Begin
+Writeln(fichier,' CreateControl (',btn[b].X-15,',',btn[b].Y-110,',',btn[b].X2-btn[b].X,',',btn[b].Y2-btn[b].Y,',','FormWnd,');
+Writeln(fichier,'                BUTTON_ID'+Chr(48+B)+',CONTROL_TYPE_BUTTON,_CS,(unsigned int)bCaption'+Chr(48+B)+',0);');
+End;
+Writeln(Fichier);
+For B := 1 To Nb_E Do Begin
+Writeln(fichier,' CreateControl (',edit[b].X-15,',',edit[b].Y-110,',',8*edit[b].car,',',20,',','FormWnd,');
+Writeln(fichier,'                0,CONTROL_TYPE_EDITBOX,_CS,(unsigned int)eCaption'+Chr(48+B)+',0);');
+
+End ;
+{
+For B := 1 To Nb_Bo Do Begin
+Writeln(Fichier,'AssignArea(',box[b].x+140,',',box[b].y+50,',',box[b].long,',',box[b].larg,',''',box[b].caption,''',',backcolor
+,');');
+End;
+For B := 1 To Nb_G Do
+Writeln(Fichier,'Gauge',B,'.Create(',ga[b].x+140,',',ga[b].y+50,',',ga[b].long,',',ga[B].larg,',',ga[B].color,',1);');
+For B := 1 To Nb_U Do
+Writeln(Fichier,'UpperArea(',up[b].x+140,',',up[B].y+50,',',up[b].long,',',up[b].larg,',',up[b].color,');');
+For B := 1 To Nb_L Do
+Writeln(Fichier,'LowerArea(',lo[b].x+140,',',lo[B].y+50,',',lo[b].long,',',lo[b].larg,',',lo[b].color,');');
+}
+For B := 1 To Nb_T Do Begin
+Writeln(Fichier,' OutTextXY(',title[B].x-15,',',title[B].y-110,',"',title[B].caption,'",FormWnd);');
+End ;
+Writeln(Fichier,'}');
+Writeln(Fichier);
+
+Close(Fichier);
+End ;
+
+Begin
+clrscr;
+write('Main Window Name  : ');Readln(St);
+Driver := Detect ;
+InitGraph ( Driver , Mode ,' ');
+SetFillStyle(1,3);Bar(0,0,640,480);
+Window(2,18,634,20,7,'CASE 1.00');
+backcolor := 7;
+Window(10,100,350,230,backcolor,st);
+J := 0 ;
+Repeat
+J := J + 5;
+B1 := 0 ;
+Repeat
+B1 := B1 + 5 ;
+putpixel(10+b1,100+j,8);
+Until b1 = 350;
+until j = 230;
+Window(390,100,240,250,7,'Objects');
+_Button(400,110,500,130,'Button');
+asm mov ah , 05h ; xor cx , cx ; mov ch , 1 ; mov cl , 27 ; int 16h end ;
+Input_Box(510,110,100);
+OutTextXy(512,118,'EditBox');
+{SetTextStyle(1,HorizDir,1);
+SetUserCharSize(1,2,1,2);}
+OutTextXy(400,140,'text');
+{SetUserCharSize(1,1,1,1);}
+SetTextStyle(0,HorizDir,1);
+AssignArea(520,140,100,50,'Box',7);
+lowerArea(400,170,100,20,7);
+SetColor(0);
+OutTextXy(410,175,'LowerArea');
+UpperArea(400,220,100,20,7);
+SetColor(0);
+OutTextXy(410,225,'UpperArea');
+Gauge(520,220,100,20,1,1);
+SetColor(15);
+OutTextXy(525,225,'Gauge');
+showMouse ;
+setcolor(0);
+outtextxy(20,25,'Fichier');
+Repeat
+asm mov ax , 3 ; int 33h ; mov sX , cx ; mov sy , dx ; mov sb , bx end ;
+if (sb=1)and(sx>10)and(sy>20)and(sx<100)and(sy<40) Then Menu ;
+if (sb=1)and(sx>400)and(sy>110)and(sx<500)and(sy<130) Then Buttons ;
+if (sb=1)and(sx>510)and(sy>110)and(sx<610)and(sy<130) Then Editboxes ;
+if (sb=1)and(sx>400)and(sy>130)and(sx<450)and(sy<160) Then _titles ;
+if (sb=1)and(sx>520)and(sy>140)and(sx<620)and(sy<190) then boxs ;
+if (sb=1)and(sx>400)and(sy>220)and(sx<500)and(sy<240) Then Upper ;
+if (sb=1)and(sx>400)and(sy>170)and(sx<500)and(sy<190) Then Lower ;
+if (sb=1)and(sx>520)and(sy>220)and(sx<620)and(sy<240) Then GAuger ;
+
+Until 1=2 ;
+
+CloseGraph ;
+End .
+
+

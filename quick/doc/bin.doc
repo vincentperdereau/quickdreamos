@@ -1,0 +1,17 @@
+ved:          Visual Editor
+ Description: A real small editor.  (temporary)
+ Usage:       ESC to quit without saving file
+              F1 save file 
+pak:          package
+ Description: create package
+ Usage:       pak date.s hostname.s src.pak
+              [ date.s and hostname in src.pak ]
+debugfs:      Debug for FileSystem
+ Description: -
+ Usage:       bitmap drive: (eg. bitmap a:)
+               show cluster used
+              chain drive: (eg. chain a:)
+               list FCB in usage
+              disk drive (eg. disk a)
+               show informations about the drive
+

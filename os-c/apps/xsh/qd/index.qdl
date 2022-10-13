@@ -1,0 +1,41 @@
+.modern
+.center
+Welcome to
+.figure
+quick.fig
+.line
+.left
+.italics
+Thank you very much for using QD-OS Floppy Edition! This document gives
+you a quick overview of some of the things you'll want to do.
+.line
+.bold
+Sections in this document
+.normal
+.tab
+
+.link
+Qd-OS Additions & Updates
+quick.qdl
+.link
+Qd-OS Configuration
+config.qdl
+.link
+Qd-OS Software
+soft.qdl
+.link
+Qd-OS Programmer's Guide
+./prog/index.qdl
+.link
+The DreamOS Project
+dreamos.qdl
+.black
+.line
+.left
+.computer
+QD-OS Team, (c) 2000 - 
+.modern
+.keepl
+.link
+quit
+<system>

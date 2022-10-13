@@ -1,0 +1,28 @@
+   AH has number function. Interruption x44
+
+.line
+ * FUNCTION:    Open A File
+   NUMBER:      0002h
+   ENTRY:       DS:SI = Pointer to an asciiz file name
+   RETURN:      EAX = handle, if (eax < 2) => error
+.line
+ * FUNCTION:    Create a file
+   NUMBER:      0003h
+   ENTRY:       DS:SI = pointer to an asciiz file name
+   RETURN:      EAX = handle, if (eax < 2) => error
+.line
+ * FUNCTION:    Read into a file
+   NUMBER:      0004h
+   ENTRY:       EDX = handle
+                ECX = number of byte wanted
+                ES:DI = buffer
+   RETURN:      0 = Ok , else error
+.line
+.link
+main
+./prog/index.qdl
+.black
+previous
+.link
+next
+./prog/api2.qdl

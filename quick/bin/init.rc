@@ -1,0 +1,8 @@
+# init.rc: system init script file
+# DreamOS (Asylum)
+# 'take the long way home'
+# serial1 mouse driver (cua0)
+device /dev/cua0
+color on
+# launch Graphic User Interface
+gui

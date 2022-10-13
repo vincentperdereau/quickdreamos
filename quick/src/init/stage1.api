@@ -1,0 +1,328 @@
+
+; ÚÄÄÄÄÄÄÄÄÄÄÂÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ¿
+; ³STAGE1.API³                                                           ³
+; ÃÄÄÄÄÄÄÄÄÄÄÙ                                                           ³
+; ³                Application Programming Interface                     ³
+; ³                                                                      ³
+; ³                                                                Alpha ³
+; ÀÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÙ
+
+
+        KRNBOX$FUNCTION         EQU          0 
+        KRNBOX$UCHAR1           EQU          1
+        KRNBOX$UINT1            EQU          2
+        KRNBOX$UINT2            EQU          4
+        KRNBOX$ULONG1           EQU          6
+        KRNBOX$ULONG2           EQU          10   
+
+        KRNBOX$ADDR$INT         EQU          20h
+        KRNBOX$INT              EQU          21h 
+        KRNBOX$SEG              EQU          1000h   
+
+        API$TEST                EQU          0001h
+        API$FOPEN               EQU          0002h   
+        API$FCREATE             EQU          0003h   
+        API$FREAD               EQU          0004h
+        API$FWRITE              EQU          0005h
+        API$CHDRIVE             EQU          0006h   
+        API$CHDIR               EQU          0007h
+        API$MKDIR               EQU          0008h
+        API$FCBDIR              EQU          0009h
+        API$INFOS               EQU          000Ah
+        API$FCBCOUNT            EQU          000Bh
+        API$FSIZE               EQU          000Ch
+        API$FRM                 EQU          000Dh
+        API$RMDIR               EQU          000Eh
+        API$ACDIR               EQU          000Fh   
+
+        jmp     code_next
+
+        KRNBOX$ADDR     DW      ?
+
+        disk$state      STRUC
+         cyl            DW      ?
+         head           DB      ?
+         sector         DB      ?
+         max$addr       DD      ?
+         bitmap$size    DD      ?
+         drive          DB      ?
+        disk$state      ENDS
+
+
+;============================================================================
+; init$api:  initialize and test stage1 API
+; no entry
+; return: ax=1 if Ok, else ax=0
+
+        init$api        PROC
+                push    bx
+                int     KRNBOX$ADDR$INT
+                mov     cs:KRNBOX$ADDR,bx
+                mov     ax,KRNBOX$SEG
+                mov     gs,ax
+                mov     byte ptr gs:[bx+KRNBOX$FUNCTION],API$TEST
+                int     KRNBOX$INT
+                mov     ax,gs:[bx+KRNBOX$UINT1]
+                cmp     ax,1234
+                je      init$api$ok
+                mov     ax,0
+                jmp     init$api$end
+        init$api$ok:
+                mov     ax,1
+        init$api$end:
+                pop     bx
+                ret
+        init$api        ENDP
+;============================================================================
+; fopen:        open a file
+; entry:        DS:SI: pointer to an asciiz file name
+; return:       eax = handle (eax=0 means error)
+                
+        fopen           PROC
+                push    bx
+                mov     bx,cs:KRNBOX$ADDR
+                mov     ax,ds
+                mov     gs:[bx+KRNBOX$UINT1],ax
+                mov     gs:[bx+KRNBOX$UINT2],si
+                mov     byte ptr gs:[bx+KRNBOX$FUNCTION],API$FOPEN
+                int     KRNBOX$INT
+                mov     eax,gs:[bx+KRNBOX$ULONG1]
+                pop     bx
+                ret
+        fopen           ENDP
+;============================================================================
+; fcreate:      create a file
+; entry:        DS:SI: pointer to an asciiz file name
+; return:       eax = handle (eax=0 means error)
+
+        fcreate         PROC
+                push    bx
+                mov     bx,cs:KRNBOX$ADDR
+                mov     ax,ds
+                mov     gs:[bx+KRNBOX$UINT1],ax
+                mov     gs:[bx+KRNBOX$UINT2],si
+                mov     byte ptr gs:[bx+KRNBOX$FUNCTION],API$FCREATE
+                int     KRNBOX$INT
+                mov     eax,gs:[bx+KRNBOX$ULONG1]
+                pop     bx
+                ret
+        fcreate         ENDP
+;============================================================================
+; fread:        read a file
+; entry:        EDX:    handle
+;               ECX:    number of byte wanted
+;               ES:DI:  pointer to a buffer
+; return:       AX:     0 = Ok, else error
+
+         fread          PROC
+                push    bx
+                mov     bx,cs:KRNBOX$ADDR
+                mov     ax,es
+                mov     byte ptr gs:[bx+KRNBOX$FUNCTION],API$FREAD
+                mov     gs:[bx+KRNBOX$UINT1],ax
+                mov     gs:[bx+KRNBOX$UINT2],di
+                mov     gs:[bx+KRNBOX$ULONG1],edx
+                mov     gs:[bx+KRNBOX$ULONG2],ecx
+                int     KRNBOX$INT
+                xor     ah,ah
+                mov     al,gs:[bx+KRNBOX$UCHAR1]
+                pop     bx
+                ret
+         fread          ENDP
+;============================================================================
+; fwrite:       write into a file
+; entry:        EDX:    handle
+;               ECX:    number of byte
+;               DS:SI:  pointer to a buffer
+; return        AX:     0 = Ok, else error
+
+         fwrite         PROC
+                push    bx
+                mov     bx,cs:KRNBOX$ADDR
+                mov     ax,ds
+                mov     byte ptr gs:[bx+KRNBOX$FUNCTION],API$FWRITE
+                mov     gs:[bx+KRNBOX$UINT1],ax
+                mov     gs:[bx+KRNBOX$UINT2],si
+                mov     gs:[bx+KRNBOX$ULONG1],edx
+                mov     gs:[bx+KRNBOX$ULONG2],ecx
+                int     KRNBOX$INT
+                xor     ah,ah
+                mov     al,gs:[bx+KRNBOX$UCHAR1]
+                pop     bx
+                ret
+         fwrite         ENDP
+;============================================================================
+; chdrive:      change actual drive
+; entry:        AL=drive ( 0=a: , 80h=c: )
+; return:
+
+        chdrive         PROC
+                push    bx
+                mov     bx,cs:KRNBOX$ADDR
+                mov     byte ptr gs:[bx+KRNBOX$FUNCTION],API$CHDRIVE
+                mov     gs:[bx+KRNBOX$UCHAR1],al
+                int     KRNBOX$INT
+                mov     al,gs:[bx+KRNBOX$UCHAR1]
+                pop     bx
+                ret
+        chdrive         ENDP
+;============================================================================
+; mkdir:        create a new directory
+; entry:        DS:SI:  pointer to an asciiz dir name
+; return:       al = 1 If Ok, else error
+
+        mkdir           PROC
+                push    bx
+                mov     bx,cs:KRNBOX$ADDR
+                mov     byte ptr gs:[bx+KRNBOX$FUNCTION],API$MKDIR
+                mov     gs:[bx+KRNBOX$UINT1],ds
+                mov     gs:[bx+KRNBOX$UINT2],si
+                int     KRNBOX$INT
+                mov     al,gs:[bx+KRNBOX$UCHAR1]
+                pop     bx
+                ret
+        mkdir           ENDP
+;============================================================================
+; fcbdir:       listing file(s)
+; entry:        EDX = cluster ( start = 18; end = 218 )
+;               ES:DI = pointer to a buffer
+; return:       AL = 1 if Ok ,else 0
+
+        fcbdir          PROC
+                push    bx
+                mov     bx,cs:KRNBOX$ADDR
+                mov     byte ptr gs:[bx+KRNBOX$FUNCTION],API$FCBDIR
+                mov     gs:[bx+KRNBOX$ULONG1],edx
+                mov     gs:[bx+KRNBOX$UINT1],es
+                mov     gs:[bx+KRNBOX$UINT2],di
+                int     KRNBOX$INT
+                mov     al,gs:[bx+KRNBOX$UCHAR1]
+                pop     bx
+                ret
+        fcbdir          ENDP
+;============================================================================
+; infos:        get file infos
+; entry:        DS:SI = pointer to an disk$state structure
+; return:       none
+
+        infos           PROC
+                push    bx
+                mov     bx,cs:KRNBOX$ADDR
+                mov     byte ptr gs:[bx+KRNBOX$FUNCTION],API$INFOS
+                mov     gs:[bx+KRNBOX$UINT1],ds
+                mov     gs:[bx+KRNBOX$UINT2],si
+                int     KRNBOX$INT
+                pop     bx
+                ret
+        infos           ENDP
+;============================================================================
+; fcbcount:     get fcb number ( for actual drive )
+; entry:        none
+; return:       eax: fcb count
+
+        fcbcount        PROC
+                push    bx
+                mov     bx,cs:KRNBOX$ADDR
+                mov     word ptr gs:[bx+KRNBOX$UINT1],0
+                mov     byte ptr gs:[bx+KRNBOX$FUNCTION],API$FCBCOUNT
+                int     KRNBOX$INT
+                mov     eax,gs:[bx+KRNBOX$ULONG1]
+                pop     bx
+                ret
+        fcbcount        ENDP
+;============================================================================
+; fsize:        get file size
+; entry:        edx = file handle
+; return:       ecx = size (byte)
+
+        fsize           PROC
+                push    bx
+                mov     bx,cs:KRNBOX$ADDR
+                mov     byte ptr gs:[bx+KRNBOX$FUNCTION],API$FSIZE
+                mov     gs:[bx+KRNBOX$ULONG2],edx
+                int     KRNBOX$INT
+                mov     ecx,gs:[bx+KRNBOX$ULONG1]
+                mov     al,gs:[bx+KRNBOX$UCHAR1];
+                pop     bx
+                ret
+        fsize           ENDP
+
+;============================================================================
+; frm:          remove a file
+; entry:        edx = handle
+; return:       al = 1 if Ok, else error
+        
+        frm             PROC
+                push    bx
+                mov     bx,cs:KRNBOX$ADDR
+                mov     byte ptr gs:[bx+KRNBOX$FUNCTION],API$FRM
+                mov     gs:[bx+KRNBOX$ULONG1],edx
+                int     KRNBOX$INT
+                mov     al,gs:[KRNBOX$UCHAR1]
+                pop     bx
+                ret
+        frm             ENDP
+;============================================================================
+; rmdir:        remove an empty directory ( MUST BE EMPTY !! )
+; entry:        DS:SI = pointer to an asciiz dir name
+; return:       al=1 if Ok, else error
+
+        rmdir           PROC
+                push    bx
+                mov     bx,cs:KRNBOX$ADDR
+                mov     byte ptr gs:[bx+KRNBOX$FUNCTION],API$RMDIR
+                mov     gs:[bx+KRNBOX$UINT1],ds
+                mov     gs:[bx+KRNBOX$UINT2],si
+                int     KRNBOX$INT
+                mov     al,gs:[bx+KRNBOX$UCHAR1]
+                pop     bx
+                ret
+        rmdir           ENDP
+
+;============================================================================
+; chdir:        change actual dir
+; entry:        DS:SI = pointer to an asciiz dir name (must '/.' terminated)
+; return:       eax = code dir, 0xffffffff => error
+        chdir           PROC
+                push    bx
+                mov     bx,cs:KRNBOX$ADDR
+                mov     byte ptr gs:[bx+KRNBOX$FUNCTION],API$CHDIR
+                mov     gs:[bx+KRNBOX$UINT1],ds
+                mov     gs:[bx+KRNBOX$UINT2],si
+                int     KRNBOX$INT
+                mov     eax,gs:[bx+KRNBOX$ULONG1]
+                pop     bx
+                ret
+        chdir           ENDP        
+;============================================================================
+; acdir:        get actual dir
+; entry:        none
+; return:       eax = code dir, 0xffffffff => error
+        acdir           PROC
+                push    bx
+                mov     bx,cs:KRNBOX$ADDR
+                mov     byte ptr gs:[bx+KRNBOX$FUNCTION],API$ACDIR
+                int     KRNBOX$INT
+                mov     eax,gs:[bx+KRNBOX$ULONG1]
+                pop     bx
+                ret
+        acdir           ENDP
+;============================================================================
+; f_set_attr:   set attribut
+; entry:        edx = file handle
+;               cl = attrib
+; return:       ax = 1 if good, else 0
+        f_set_attr      PROC
+                push    bx
+                mov     bx,cs:KRNBOX$ADDR
+                mov     byte ptr gs:[bx+KRNBOX$FUNCTION],API$FCBCOUNT
+                mov     word ptr gs:[bx+KRNBOX$UINT1],0ah
+                mov     gs:[bx+KRNBOX$ULONG1],edx
+                mov     gs:[bx+KRNBOX$UCHAR1],cl
+                int     KRNBOX$INT
+                mov     ax,gs:[bx+KRNBOX$UINT2]
+                pop     bx
+                ret
+        f_set_attr      ENDP
+;============================================================================
+        code_next:

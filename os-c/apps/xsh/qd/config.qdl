@@ -1,0 +1,38 @@
+.left
+.bold
+QD-OS Configuration
+.line
+
+.normal
+.italics
+batch file
+.normal
+/etc/init.rc: batch file for system initialization.
+/etc/shut.rc: batch file for system shutdown.
+
+.italics
+select keyboard:
+.normal
+.red
+ /lib/kbd/ 
+.black
+.keepl
+directory contains several .map files for keyboard.
+.left
+ To change keyboard, delete 
+.keepl
+.red
+keymap 
+.black
+.keepl
+file, and copy your .map as 
+.red
+.keepl
+keymap
+.black
+
+.line
+.left
+.link
+back
+index.qdl

@@ -1,0 +1,31 @@
+.line
+ * FUNCTION:    Remove an empty directory (MUST BE EMPTY)
+   NUMBER:      000Eh
+   ENTRY:       DS:SI = asciiz dir name
+   RETURN:      al = 1 if Ok, else 0
+.line
+ * FUNCTION:    Retry actual dir code
+   NUMBER:      000Fh
+   ENTRY:       none
+   RETURN:      eax = actual dir code, (0xffffffff => error)
+.line
+ * FUNCTION:    Write string
+   NUMBER:      0010h
+   ENTRY:       DS:SI = asciiz pointer
+   RETURN:      none
+.line
+ * FUNCTION:    Read a line
+   NUMBER:      0011h
+   ENTRY:       ES:BX = buffer
+                CX = characters count wanted
+   RETURN:      ES:BX = asciiz 
+.line
+.link
+main
+./prog/index.qdl
+.link
+previous
+./prog/api3.qdl
+.link
+next
+./prog/api5.qdl

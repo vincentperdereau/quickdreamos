@@ -1,0 +1,64 @@
+as:  [ version 0.0.1b ] [DreamOS]
+
+instructions support‚es:
+------------------------
+
+* registres:
+  tous les registres 16-bit
+
+* instructions sans op‚randes
+  stosb, stosw, scasb, scasw, cld, cmc, cwd, nop, cbw, std, clc, stc,
+  pushf, pusha, popf, popa, aaa, aas, cli, sti, rep, repc, repz, lahf,
+  sahf, hlt, repe, repne, repnz, repnc, cmpsb, cmpsw, movsb, movsw, ret,
+  retf, iret
+
+* instructions de saut:
+  je, ja, jae, jb, jbe, jc, jcxz, jg, jge, jl, jle, jna, jnae, jnb,
+  jnbe, jnc, jne, jng, jnge, jnl, jnle, jno, jnp, jns, jnz, jo, jp,
+  jpe, js,
+  loop, loope, loopne, loopnz, loopz
+
+* autres instructions:
+  adc, add, and, cmp, or, sbb, sub, xor, xchg, dec, div, idiv, imul,
+  mul, neg, not, inc, shr, rcl, rol, sal, shl, rcr, ror, sar, int
+
+* syntaxe:
+  o) num‚ration:
+      ‚criture d‚cimale: nombre (ex: mov ax,1) (ou %nombre)
+      ‚criture hexad‚cimale: $nombre (ex: mov ax,$a)
+      ‚criture binaire: #nombre (ex: mov al,#1001)
+      ‚criture lettre: 'lettre' (ex: mov al,'b')
+  o) labels:
+      label:
+  o) r‚servation m‚moire:
+     la r‚f‚rence … une variable se fait obligatoirement aprŠs
+     la d‚claration:
+     ex:
+   &  ; exemple correct       &       ; exemple incorrect   &
+   &   jmp start              &         mov var1,1          &
+   &  var1:                   &         var1:               &
+   &       .byte 0            &          .byte 0            &
+   &   start:                 &                             &
+   &    mov var1,1            &                             &
+   &                          &                             &
+   o) types des variables:
+      .byte
+      .word
+      .array (ex: .array 10 'a'  ; rempli 10 octets avec le caractŠre 'a')
+      .string (ex: .string "hello")
+  o) segments:
+     .es
+     .cs
+     ex: avec TASM,
+         mov es:[bx],ax
+         avec AS,
+         .es
+         mov [bx],ax
+ o) instruction 'mov'
+    mov reg,reg (mov ax,bx)
+    mov reg,ib/iw (mov ax,1)
+    mov byte/word ptr [],x (mov byte ptr [bx],1)
+    mov [bx/di/si],x  (mov [si],ax)
+    mov x,[bx/di/si] (mov ax,[si])
+    mov x,offset xxx (mov si,offset str)
+

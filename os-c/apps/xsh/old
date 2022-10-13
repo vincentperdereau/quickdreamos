@@ -1,0 +1,54 @@
+void manage_event (void)
+{
+ int choice;
+
+ while (!quit)
+ {
+
+  if (is_key ())
+  {
+   key = getch ();
+  }
+
+  asm { 
+        mov ax,3
+        int 0x33
+	mov mx,cx
+        mov my,dx
+      }
+
+  if (bmouse ())
+  {
+   if ( (mx > 2) && (my > 460) && (mx < 105) && (my < 478) )
+   {
+   hidemouse ();
+   pButton (2,460,105,478,dream);
+   showmouse ();
+   while ( bmouse () ) ;
+   choice = popup (8,quick,1,326,104);
+   if (choice == 1) console ();
+   hidemouse ();
+   Button (2,460,105,478,dream);
+   showmouse ();
+   if (choice == 8) { quit = 1; shut (); };
+   }
+  }
+
+  if ( is_alt () )
+  {
+   hidemouse ();
+   pButton (2,460,105,478,dream);
+   showmouse ();
+   choice = popup (8,quick,1,326,104);
+   if (choice == 1) console ();
+   hidemouse ();
+   Button (2,460,105,478,dream);
+   showmouse ();
+   if (choice == 8) { quit = 1; shut (); };
+  }
+
+ }
+}
+
+// *******************
+

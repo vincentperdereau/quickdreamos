@@ -1,0 +1,30 @@
+.line
+ * FUNCTION:    Memory Allocation
+   NUMBER:      0012h
+   ENTRY:       BX = paragraph (16 bytes)
+   RETURN:      AX:0 = area reserved (segment)
+.line
+ * FUNCTION:    Memory Release
+   NUMBER:      0013h
+   ENTRY:       BX = segment
+   RETURN:      none
+.line
+ * FUNCTION:    Exec
+   NUMBER:      0014h
+   ENTRY:       DS:SI = asciiz file name
+   RETURN:      none
+.line
+ * FUNCTION:    Memory Available
+   NUMBER:      0015h
+   ENTRY:       none
+   RETURN:      AX = paragraph available
+.line
+.link
+main
+./prog/index.qdl
+.link
+previous
+./prog/api4.qdl
+.link
+next
+./prog/api6.qdl

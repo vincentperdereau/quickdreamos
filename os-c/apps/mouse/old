@@ -1,0 +1,32 @@
+
+        mov dx,port_com1 + 3
+        mov al,0080h
+        out dx,al
+        mov dx,port_com1 + 0
+        mov al,0060h
+        out dx,al
+        mov dx,port_com1 + 1
+        mov al,0000h
+        out dx,al
+        mov dx,port_com1 + 3
+        mov al,0002h
+        out dx,al
+        mov dx,port_com1 + 1
+        mov al,0000h
+        out dx,al
+        mov dx,port_com1 + 4
+        mov al,0001h
+        out dx,al
+        mov dx,port_com1 + 5
+        in  al,dx
+        mov dx,port_com1 + 1
+        mov al,0001h
+        out dx,al
+        mov dx,port_com1 + 4
+        mov al,000bh
+        out dx,al
+
+        mov dx,port_pic_master
+        in  al,dx
+        xor al,IRQ_mask
+        out dx,al

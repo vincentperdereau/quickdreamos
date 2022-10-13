@@ -1,0 +1,5 @@
+# shut.rc: script file for system shutdown
+# project DreamOS (Asylum)
+# modified: vincent.perdereau@lemel.fr
+pic /lib/shut.bmp p
+

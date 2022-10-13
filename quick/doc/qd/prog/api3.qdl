@@ -1,0 +1,31 @@
+.line
+ * FUNCTION:    Listing File
+   NUMBER:      0009h
+   ENTRY:       EDX = cluster
+                ES:DI = pointer to a buffer
+   RETURN:      AL = 1 if Ok, else 0        
+.line
+ * FUNCTION:    Get FCB Number of actual disk
+   NUMBER:      000Bh
+   ENTRY:       none
+   RETURN:      eax = fcb count
+.line
+ * FUNCTION:    File size
+   NUMBER:      000Ch
+   ENTRY:       EDX = file handle
+   RETURN:      ECX = size (byte)
+.line
+ * FUNCTION:    Remove a file
+   NUMBER:      000Dh
+   ENTRY:       EDX = handle
+   RETURN:      AL = 1 if ok, else 0
+.line
+.link
+main
+./prog/index.qdl
+.link
+previous
+./prog/api2.qdl
+.link
+next
+./prog/api4.qdl

@@ -1,0 +1,161 @@
+#include "port.h"
+
+#define	port_com1	0x3f8
+#define port_pic_master 0x21
+#define	IRQ_mask	0x10
+#define	intIRQ		0x0c
+
+int max_screen_x;
+int max_screen_y;
+
+static unsigned int     bytepos=0, coordinate;
+static unsigned char    mpacket[3];
+static signed int       mouse_x, mouse_y;
+static unsigned char    mouse_button1, mouse_button2;
+static signed int       horiz_sensitivity, vert_sensitivity;
+static unsigned char    activated=0;
+static unsigned int	rax,rbx,rcx,rdx;
+
+interrupt serial_driver ()
+{
+	unsigned int mbyte;
+
+	asm { mov ax,cs ; mov ds,ax };
+
+if (activated)
+ {
+	mbyte=inb(port_com1);
+	// Synchronize
+	if((mbyte&64)==64) { bytepos=0; };
+
+	mpacket[bytepos]=mbyte;
+	bytepos++;
+
+	// Process packet
+	if (bytepos==3) {
+		// Retrieve change in x and y from packet
+		int change_x=((mpacket[0] & 3) << 6) + mpacket[1];
+		int change_y=((mpacket[0] & 12) << 4) + mpacket[2];
+
+		// Some mice need this
+		if(coordinate==1) {
+		  change_x-=128;
+		  change_y-=128;
+		};
+
+		// Change to signed
+		if(change_x>=128) { change_x=change_x-256; };
+		if(change_y>=128) { change_y=change_y-256; };
+
+		// Adjust mouse position according to sensitivity
+		mouse_x+=change_x/horiz_sensitivity;
+		mouse_y+=change_y/vert_sensitivity;
+
+		// Check that mouse is still in screen
+		if(mouse_x<0) { mouse_x=0; };
+		if(mouse_x>max_screen_x) { mouse_x=max_screen_x; };
+		if(mouse_y<0) { mouse_y=0; };
+		if(mouse_y>max_screen_y) { mouse_y=max_screen_y; };
+
+		// Retrieve mouse button status from packet
+		mouse_button1=mpacket[0] & 32;
+		mouse_button2=mpacket[0] & 16;
+
+		bytepos=0;
+	};
+
+ asm {
+	mov ax,word ptr MGRP:_mouse_button2
+	shl ax,1
+	add ax,word ptr MGRP:_mouse_button1
+	mov cx,word ptr MGRP:_mouse_x
+	mov dx,word ptr MGRP:_mouse_y
+	int 0x34
+     }
+
+ outb (0x20,0x20);
+ }
+
+};
+
+
+interrupt driver_interface ()
+{
+
+  asm { mov dx,cs ; mov ds,dx };
+  rax = _AX;
+  rbx = _BX;
+  rcx = _CX;
+  switch (rax)
+  {
+   case 0x0001: max_screen_x = rbx;
+		max_screen_y = rcx;
+		mouse_x = ((max_screen_x-1) >> 1) + 1;
+		mouse_y = ((max_screen_y-1) >> 1) + 1;
+		break;
+   case 0x0002: activated = 1;
+		outb (port_pic_master, inb (port_pic_master) ^ IRQ_mask);
+		break;
+   case 0x0003: activated = 0;
+		outb (port_pic_master, inb (port_pic_master) ^ IRQ_mask);
+   default: 	break;
+  }
+}
+
+
+void set_vector (void* handle, int intr)
+{
+ asm {
+	cli
+	push ax
+	push bx
+	push es
+	mov ax,0
+	mov es,ax
+	mov bx,intr
+	shl bx,2
+	mov ax,handle
+	mov es:[bx],ax
+	mov ax,cs
+	mov es:[bx+2],ax
+	pop es
+	pop bx
+	pop ax
+	sti
+     }
+}
+
+void init_mouse (void)
+{
+ outb (port_com1 + 3,0x0080);
+ outb (port_com1 + 0,0x0060);
+ outb (port_com1 + 1,0x0000);
+ outb (port_com1 + 3,0x0002);
+ outb (port_com1 + 1,0x0000);
+ outb (port_com1 + 4,0x0001);
+ inb  (port_com1 + 5);
+ outb (port_com1 + 1,0x0001);
+ outb (port_com1 + 4,0x000b);
+}
+
+void init ()
+{
+ init_mouse ();
+ horiz_sensitivity = 2;
+ vert_sensitivity = 3;
+ set_vector (serial_driver,intIRQ);
+ set_vector (driver_interface,0x33);
+ max_screen_x = 639;
+ max_screen_y = 479;
+ mouse_x = (max_screen_x / 2) + 1;
+ mouse_y = (max_screen_y / 2) + 1;
+ asm {
+	push ax
+	push bx
+	mov ah,0x12
+	mov bx,50
+	int 0x44
+	pop bx
+	pop ax
+     }
+}

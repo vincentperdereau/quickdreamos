@@ -1,0 +1,19 @@
+Apps       
+Tools      
+System     
+Terminal
+Console
+Execute
+Video Lock
+Clean Up
+Shutdown   
+!
+#/etc/apps.rc
+#/etc/tools.rc
+#/etc/system.rc
+&term
+&fterm
+@/qwin/exec
+&vlock
+&clean
+#/etc/qshut.rc

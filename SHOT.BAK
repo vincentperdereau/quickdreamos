@@ -1,0 +1,46 @@
+; shot.s
+
+mov ax,$b800
+mov ds,ax
+mov si,0
+
+mov ah,$12
+mov bx,125  ; 125 = 80 * 25 / 16
+int $44
+
+mov es,ax   ; reserved segment
+mov di,0
+mov cx,2000
+
+.loop:
+
+.ds
+mov al,si
+.es
+mov di,al
+add si,2
+
+dec cx
+jnz .loop
+
+mov ah,3
+mov ax,cs
+mov ds,ax
+mov si,offset msg$
+int $44
+mov ah,5
+.byte $66
+mov dx,ax
+.byte $66
+mov cx,2000
+mov ax,es
+mov ds,ax
+mov si,0
+int $44
+
+retf
+
+msg$:
+.string "shot.txt"
+.byte 0
+
