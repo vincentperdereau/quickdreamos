@@ -7,3 +7,5 @@ Borland C++ 7
 
 Information : vincentperdereau@yahoo.fr
 
+Floppy disk image 'qd.img' can be used with the website https://copy.sh/v86/
+
