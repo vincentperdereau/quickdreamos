@@ -11,3 +11,7 @@
  del *.map
  del *.exe
 
+tinyfs "rm /sh"
+tinyfs "put sh.bin /sh"
+
+

@@ -44,7 +44,7 @@ void StartProgram ()
 
  MyWindow = CreateWindow (120,120,180+50,40,"Disk size",&WinMain);
  SetColor (8);
- Bar (135,140,335,150);
+ Bar (135,142,335,152);
  SetColor (9);
 
 // *******************************************
@@ -77,11 +77,11 @@ void StartProgram ()
 // *******************************************
  diff = (j * 50) / i;
 
- Bar (135,140, 135 + (unsigned int)diff,150);
+ Bar (135,142, 135 + (unsigned int)diff,152);
  SetColor (0);
  S[0] = (_drive == 0x80) ? 'C' : 'A';
  S[1] = 0;
- OutTextXY (210,0,S,MyWindow);
+ OutTextXY (210,1,S,MyWindow);
  SetColor (7);
 
 }

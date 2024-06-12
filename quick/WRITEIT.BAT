@@ -30,7 +30,7 @@ pause
 .\util\tinyfs "mkdir src/system"
 .\util\tinyfs "mkdir src/api"
 .\util\tinyfs "mkdir qwin"
-rem .\util\tinyfs "put .\bin\antique /lib/fnt/antique"
+.\util\tinyfs "put .\bin\antique /lib/fnt/antique"
 .\util\tinyfs "put .\bin\hylas.fnt /lib/fnt/hylas.fnt"
 .\util\tinyfs "put .\bin\breeze.fnt /lib/fnt/breeze.fnt"
 .\util\tinyfs "put .\bin\comp.fnt /lib/fnt/comp.fnt"
@@ -50,6 +50,7 @@ rem .\util\tinyfs "put .\bin\pshot.bin /bin/pshot"
 .\util\tinyfs "put .\bin\pak.bin /bin/pak"
 .\util\tinyfs "put .\bin\mmap.bin /bin/mmap"
 .\util\tinyfs "put .\bin\type.bin /bin/type"
+.\util\tinyfs "put .\bin\debugfs.bin /bin/debugfs"
 .\util\tinyfs "put .\bin\hostname.bin /bin/hostname"
 .\util\tinyfs "put .\bin\fire.bin /bin/fire"
 .\util\tinyfs "put .\bin\kmsg.bin /bin/kmsg"
@@ -89,6 +90,7 @@ rem ****** driver ****************************
 rem .\util\tinyfs "put .\bin\cs4235.bin /lib/cs4235"
 
 .\util\tinyfs "put .\bin\serial.bin /dev/cua0"
+.\util\tinyfs "put .\bin\ps2m.bin /dev/ps2mouse"
 .\util\tinyfs "put .\doc\sh.doc /doc/sh.doc"
 .\util\tinyfs "put .\doc\as.doc /doc/as.doc"
 .\util\tinyfs "put .\doc\api.doc /doc/api.doc"
@@ -111,16 +113,10 @@ rem if errorlevel 2 goto no1
 .\util\tinyfs "put .\bin\src\api\sysinfo.s /src/api/sysinfo.s"
 .\util\tinyfs "put .\bin\whello.s /src/whello.s"
 
-goto no
-:no1
-cls
-choice /c:on Copy Help Navigator ?
-if errorlevel 2 goto no
-cd .\doc\qd
-rem call writeit.bat
-cd ..\..
 
-:no
+cd .\doc\qd
+call writeit.bat
+cd ..\..
 
 echo Termin‚
 echo.

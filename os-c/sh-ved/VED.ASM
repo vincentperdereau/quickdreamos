@@ -15,7 +15,7 @@ $comm	macro	name,dist,size,count
 	endif
 	?debug	V 300h
 	?debug	S "ved.c"
-	?debug	C E96E85012B057665642E63
+	?debug	C E91256BB58057665642E63
 VPSEG	segment byte public use16 
 VPSEG	ends
 MGRP	group	VPSEG
@@ -51,7 +51,7 @@ _ProgramEntry	endp
 _isecho	label	word
 	db	1
 	db	0
-	?debug	C E970748327122E5C494E434C5544455C7374646F75742E68
+	?debug	C E9E34B5357122E5C494E434C5544455C7374646F75742E68
    ;	
    ;	void putc (char c)
    ;	
@@ -152,7 +152,7 @@ _puts	proc	near
 	pop	bp
 	ret	
 _puts	endp
-	?debug	C E9CEA449270E2E5C494E434C5544455C6D6D2E68
+	?debug	C E9E34B53570E2E5C494E434C5544455C6D6D2E68
    ;	
    ;	 addr malloc (unsigned int paragraph)
    ;	
@@ -250,7 +250,7 @@ _avail	proc	near
    ;	
 	ret	
 _avail	endp
-	?debug	C E90D7FEF2A102E5C494E434C5544455C66696C652E68
+	?debug	C E9E34B5357102E5C494E434C5544455C66696C652E68
    ;	
    ;	 handle fopen (char* fname)
    ;	
@@ -788,8 +788,8 @@ _exec	proc	near
 	leave	
 	ret	
 _exec	endp
-	?debug	C E951A31127132E5C494E434C5544455C747970656465662E68
-	?debug	C E958571D27122E5C494E434C5544455C6D656D6F72792E68
+	?debug	C E9E34B5357132E5C494E434C5544455C747970656465662E68
+	?debug	C E9E34B5357122E5C494E434C5544455C6D656D6F72792E68
    ;	
    ;	void memcpy (uint segc,uint ofsc,uint segs,uint ofss,uint count)
    ;	
@@ -964,7 +964,7 @@ _memset	proc	near
 	pop	bp
 	ret	
 _memset	endp
-	?debug	C E901635A2A122E5C494E434C5544455C737472696E672E68
+	?debug	C E9E34B5357122E5C494E434C5544455C737472696E672E68
    ;	
    ;	  void strcpy (string c, string s)
    ;	
@@ -1146,7 +1146,7 @@ _strcmp	proc	near
 	leave	
 	ret	
 _strcmp	endp
-	?debug	C E9407A42270F2E5C494E434C5544455C6172672E68
+	?debug	C E9E34B53570F2E5C494E434C5544455C6172672E68
    ;	
    ;	char* get_argz (char* line,int count)
    ;	
@@ -3156,7 +3156,7 @@ _ProgramStart	proc	near
 	je	short @42@86
 	push	offset MGRP:s@+30
 	call	near ptr MGRP:_puts
-	jmp	@42@786
+	jmp	@42@814
 @42@86:
    ;	
    ;	                 return ;
@@ -3284,13 +3284,10 @@ _ProgramStart	proc	near
 	push	large 0
 	call	near ptr MGRP:_DispText
 	add	sp,4
-   ;	
-   ;	   opened =1;
-   ;	
-	mov	word ptr MGRP:_opened,1
-	jmp	short @42@310
+	jmp	@42@450
 @42@254:
    ;	
+   ;	   opened =1;
    ;	  }
    ;	
    ;	 }
@@ -3318,12 +3315,16 @@ _ProgramStart	proc	near
    ;	  if (KeyCode==1) break;
    ;	
 	cmp	byte ptr MGRP:_KeyCode,1
-	je	short @42@534
+	jne short	@@13
+	jmp	@42@562
+@@13:
    ;	
-   ;	  if (KeyCode==59) {
+   ;	  if (C==0x13) {
    ;	
-	cmp	byte ptr MGRP:_KeyCode,59
-	jne	short @42@450
+	cmp	byte ptr MGRP:_C,19
+	je short	@@14
+	jmp	@42@478
+@@14:
    ;	
    ;			    if (opened) { fremove (file1) ;
    ;	
@@ -3332,11 +3333,37 @@ _ProgramStart	proc	near
 	push	dword ptr MGRP:_file1
 	call	near ptr MGRP:_fremove
 	add	sp,4
-@42@422:
    ;	
    ;					  file1 = fcreate ((string)get_argz(argv,2));
+   ;	
+	push	2
+	push	offset MGRP:_argv
+	call	near ptr MGRP:_get_argz
+	add	sp,4
+	push	ax
+	call	near ptr MGRP:_fcreate
+	push	dx
+	push	ax
+	pop	eax
+	pop	cx
+	mov	dword ptr MGRP:_file1,eax
+   ;	
    ;					  fwrite (file1,textsize(),0,segbuffer);
+   ;	
+	push	word ptr MGRP:_segbuffer
+	push	0
+	call	near ptr MGRP:_textsize
+	push	dx
+	push	ax
+	push	dword ptr MGRP:_file1
+	call	near ptr MGRP:_fwrite
+	add	sp,12
+   ;	
    ;					}
+   ;	
+	jmp	short @42@310
+@42@422:
+   ;	
    ;			    else {
    ;				  file1 = fcreate ((string)get_argz(argv,2));
    ;	
@@ -3362,8 +3389,13 @@ _ProgramStart	proc	near
 	push	dword ptr MGRP:_file1
 	call	near ptr MGRP:_fwrite
 	add	sp,12
-	jmp	short @42@310
 @42@450:
+   ;	
+   ;				  opened = 1;
+   ;	
+	mov	word ptr MGRP:_opened,1
+	jmp	@42@310
+@42@478:
    ;	
    ;				 }
    ;			    continue;
@@ -3372,11 +3404,11 @@ _ProgramStart	proc	near
    ;	  if (KeyCode==62) { initprint (); printit (); }
    ;	
 	cmp	byte ptr MGRP:_KeyCode,62
-	jne	short @42@506
+	jne	short @42@534
 	call	near ptr MGRP:_initprint
 	call	near ptr MGRP:_printit
-	jmp	short @42@310
-@42@506:
+	jmp	@42@310
+@42@534:
    ;	
    ;	  else Characters (C,KeyCode);
    ;	
@@ -3385,8 +3417,8 @@ _ProgramStart	proc	near
 	mov	al,byte ptr MGRP:_C
 	push	ax
 	call	near ptr MGRP:_Characters
-	jmp	short @42@282
-@42@534:
+	jmp	@42@282
+@42@562:
    ;	
    ;	 }
    ;	 ClearScreen (0x07000700);
@@ -3429,7 +3461,7 @@ _ProgramStart	proc	near
    ;	
 	push	word ptr MGRP:_segbuffer
 	call	near ptr MGRP:_free
-@42@786:
+@42@814:
 	pop	cx
    ;	
    ;	}

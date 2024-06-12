@@ -9,8 +9,8 @@ BIN     = exe2bin
 ARGK    = +kernel.cfg
 ARGM    = +modules.cfg
 RM      = del
-#BUFFER = -DNO_BUFFER
-BUFFER  = -DBUFFER
+BUFFER = -DNO_BUFFER
+#BUFFER  = -DBUFFER
 
 .PRECIOUS = main.c
 

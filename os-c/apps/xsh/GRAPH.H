@@ -921,7 +921,7 @@ void FarOutTextXY (int X, int Y,char far* s)
 
 static unsigned char BGWindow=7;
 
-void Window (int X, int Y, int w, int h,int Color, char* title)
+void Window1 (int X, int Y, int w, int h,int Color, char* title)
 {
 unsigned int u;
 /*
@@ -1015,6 +1015,87 @@ unsigned int u;
  OutTextXY (X+20,Y+1,title);
  SetColor (0);
  setFont (0);
+}
+
+void Window2 (int X, int Y, int Long, int Larg,int Color, char* title)
+{
+unsigned int u;
+unsigned int lshift = 12;
+
+ X = X + 2;
+ Y = Y + 2;
+ Long = Long - 5;
+ Larg = Larg - 4;
+
+ SetColor (7);
+ Bar (X,Y,X+Long,Y+Larg);
+ SetColor (0);
+ Rectangle (X-2,Y-2,X+Long+2,Y+Larg+2);
+ Line (X+Long+1,Y-1,X+Long+1,Y+Larg+1);
+ Line (X-1,Y+Larg+1,X+Long+1,Y+Larg+1);
+ SetColor (15);
+ Line (X-1,Y-1,X+Long+1,Y-1);
+ Line (X-1,Y-1,X-1,Y+Larg+1);
+ SetColor (0);
+ Rectangle (X+3,Y+18,X+Long-3,Y+Larg-3);
+ SetColor (15);
+ Line (X+Long-2,Y+18,X+Long-2,Y+Larg-2);
+ Line (X+3,Y+Larg-2,X+Long-2,Y+Larg-2);
+ 
+ Line (X+3+lshift,Y+3,X+Long-3,Y+3);
+ Line (X+3+lshift,Y+5,X+Long-3,Y+5);
+ Line (X+3+lshift,Y+7,X+Long-3,Y+7);
+ Line (X+3+lshift,Y+9,X+Long-3,Y+9);
+ Line (X+3+lshift,Y+11,X+Long-3,Y+11);
+ Line (X+3+lshift,Y+13,X+Long-3,Y+13);
+ 
+ Line (X+4,Y+19,X+4,Y+Larg-4);
+ Line (X+4,Y+19,X+Long-4,Y+19);
+ 
+ if (BGWindow != 7)
+ {
+       SetColor (BGWindow);
+       Bar (X+5,Y+19+1,X+Long-5,Y+Larg-5);
+ }
+
+ 
+ SetColor (8);
+ Line (X+3+lshift,Y+4,X+Long-3,Y+4);
+ Line (X+3+lshift,Y+6,X+Long-3,Y+6);
+ Line (X+3+lshift,Y+8,X+Long-3,Y+8);
+ Line (X+3+lshift,Y+10,X+Long-3,Y+10);
+ Line (X+3+lshift,Y+12,X+Long-3,Y+12);
+ Line (X+3+lshift,Y+14,X+Long-3,Y+14);
+ SetColor (7);
+ Bar ( X+(Long>>1) - (strlen (title)<<2)-6 ,Y+3,
+       X+(Long>>1) + (strlen (title)<<2)+6 ,Y+14);
+ SetColor (0);
+ if (isFont) setFont (1);
+ OutTextXY (X+(Long>>1) - (strlen (title)<<2),Y+1,title);
+ //SetColor (8);
+ //OutTextXY (X+(Long>>1) - (strlen (title)<<2),Y+2,title);
+
+ SetColor (15);
+ Line (X+11,Y+5,X+11,Y+11);
+ Line (X+5,Y+11,X+11,Y+11);
+ SetColor (8);
+ Line (X+4,Y+4,X+10,Y+4);
+ Line (X+4,Y+4,X+4,Y+10);
+
+/*
+ Line (X+w+1,Y,X+w+1,Y+h);
+ if (isFont) setFont (2);
+ SetColor (15);
+ OutTextXY (X+20,Y+1,title);
+*/ 
+ SetColor (0);
+ setFont (0);
+ BGWindow = 7;
+}
+
+void Window (int X, int Y, int w, int h,int Color, char* title)
+{
+     Window2(X, Y, w, h, Color, title);
 }
 
 void Button (int Xbut, int Ybut, int Xbut2, int Ybut2,char* caption)

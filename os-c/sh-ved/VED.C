@@ -5,6 +5,10 @@ void ProgramStart (char*,char*);
 #define FORE_COLOR      0x02
 #define ALL_COLOR       0x02000200
 
+#ifndef CTRL
+#define CTRL(c) ((c) & 037)
+#endif
+
 void ProgramEntry (void)
 {
  ProgramStart ((char*)_ES,(char*)_BX);
@@ -491,7 +495,7 @@ void ProgramStart (char* s, char* o)
  {
   C = ReadChar ();
   if (KeyCode==1) break;
-  if (KeyCode==59) {
+  if (C==0x13) {
 		    if (opened) { fremove (file1) ;
 				  file1 = fcreate ((string)get_argz(argv,2));
 				  fwrite (file1,textsize(),0,segbuffer);
@@ -499,6 +503,7 @@ void ProgramStart (char* s, char* o)
 		    else {
 			  file1 = fcreate ((string)get_argz(argv,2));
 			  fwrite (file1,textsize(),0,segbuffer);
+			  opened = 1;
 			 }
 		    continue;
 		   }

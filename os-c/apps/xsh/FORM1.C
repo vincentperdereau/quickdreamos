@@ -5,9 +5,7 @@
 #define BUTTON_ID1 1
 // Variables 
 HWND FormWnd; 
-char bCaption1 [] = "Log on";
-char eCaption1 [29] = {0,};
-char eCaption2 [29] = {0,};
+char bCaption1 [] = "test";
 
 void far WinMain (void)
 {
@@ -29,15 +27,9 @@ void far WinMain (void)
 
 void StartProgram ()
 {
- FormWnd = CreateWindow (155,150,350,250,"Login",&WinMain);
- CreateControl (242,82,85,20,FormWnd,
+ FormWnd = CreateWindow (155,150,350,250,"Sample",&WinMain);
+ CreateControl (65521,15,242,25,FormWnd,
                 BUTTON_ID1,CONTROL_TYPE_BUTTON,_CS,(unsigned int)bCaption1,0);
 
- CreateControl (85,3,232,20,FormWnd,
-                0,CONTROL_TYPE_EDITBOX,_CS,(unsigned int)eCaption1,0);
- CreateControl (87,36,232,20,FormWnd,
-                0,CONTROL_TYPE_EDITBOX,_CS,(unsigned int)eCaption2,0);
- OutTextXY(5,10,"Login:",FormWnd);
- OutTextXY(5,41,"Password:",FormWnd);
 }
 

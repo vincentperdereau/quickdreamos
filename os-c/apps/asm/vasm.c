@@ -1,4 +1,4 @@
-//#define FOR_DREAMOS
+#define FOR_DREAMOS
 
 // pour Windows/DOS/Linux: gcc main.c -o main.exe
 // pour DreamOS: makeit.bat
@@ -55,7 +55,7 @@ typedef char* string;
 #define NULL 0
 typedef unsigned int addr;
 
- addr bufferbatch;
+addr bufferbatch;
 
  char peekchar (uint ofs)
  {
@@ -84,30 +84,6 @@ typedef unsigned int addr;
  }
 
  typedef        unsigned int    addr;
-
- addr malloc (unsigned int paragraph)
- {
-  asm {
-	push bx
-        push cx
-        push di
-        push es
-        mov ah,0x0012
-	mov bx,paragraph
-	int 0x44
-        mov bx,ax
-        mov es,ax
-        mov di,0
-        mov cx,0fff0h
-        mov ax,0
-        rep stosb
-        mov ax,bx
-        pop es
-        pop di
-        pop cx
-        pop bx
-      }
- }
 
  void free (addr adr)
  {
@@ -147,6 +123,30 @@ void puts (char* s)
 {
  int i;
  for (i=0; s[i] != 0; i++) putc (s[i]);
+}
+
+ addr malloc (unsigned int paragraph)
+ {
+  asm {
+	push bx
+        push cx
+        push di
+        push es
+        mov ah,0x0012
+	mov bx,paragraph
+	int 0x44
+        mov bx,ax
+        mov es,ax
+        mov di,0
+	mov cx,0fff0h
+        mov ax,0
+	// rep stosb
+        mov ax,bx
+        pop es
+        pop di
+        pop cx
+        pop bx
+      }
 }
 
 extern handle fopen (char*	filename);
@@ -825,13 +825,15 @@ void start_program ()
  memcpy ((uint)_CS,(uint)argv,_ES,_BX,19);
  puts ("\n\r");
  puts (get_argz(argv,2));putc (':');
+ puts ("malloc ...\n\r");
  binary = (addr)(malloc (40000>>4));
  asm {	shl dword ptr binary,16 }
+ puts (get_argz(argv,2));
  input = fopen (get_argz(argv,2));
  if (input < 2) { puts ("input file incorrect.");
                   asm {  shr dword ptr binary,16 };
-                  free ((addr)binary); return ; }
- bufferbatch = malloc (0xfff);
+		  free ((addr)binary); return ; }
+ bufferbatch = malloc (8000 >> 4);
  fread (input,fsize(input),0,bufferbatch);
  output = fcreate (prog_name(get_argz(argv,2)));
  if (output < 2) { puts ("can't create output");

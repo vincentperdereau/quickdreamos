@@ -15,8 +15,8 @@ $comm	macro	name,dist,size,count
 	endif
 	?debug	V 300h
 	?debug	S "sh.c"
-	?debug	C E935A9D42C0473682E63
-	?debug	C E9F4726627132E5C494E434C5544455C737461727475702E68
+	?debug	C E9F94CBF580473682E63
+	?debug	C E9E34B5357132E5C494E434C5544455C737461727475702E68
 VPSEG	segment byte public use16 
 VPSEG	ends
 MGRP	group	VPSEG
@@ -62,7 +62,28 @@ _startup	endp
 _isecho	label	word
 	db	1
 	db	0
-	?debug	C E970748327122E5C494E434C5544455C7374646F75742E68
+   ;	
+   ;	 char is_xsh (void)
+   ;	
+	assume	cs:MGRP
+_is_xsh	proc	near
+   ;	
+   ;	{
+   ;	 asm {
+   ;	        mov ah,4
+   ;	
+	mov	 ah,4
+   ;	
+   ;	        int 0x46
+   ;	
+	int	 046H
+   ;	
+   ;	     }
+   ;	}
+   ;	
+	ret	
+_is_xsh	endp
+	?debug	C E9E34B5357122E5C494E434C5544455C7374646F75742E68
    ;	
    ;	void putc (char c)
    ;	
@@ -108,7 +129,7 @@ _puts	proc	near
    ;	 if (isecho)
    ;	
 	cmp	word ptr MGRP:_isecho,0
-	je	short @3@366
+	je	short @4@366
    ;	
    ;	 asm {
    ;	        push    ax
@@ -154,7 +175,7 @@ _puts	proc	near
    ;	        pop     ax
    ;	
 	pop	     ax
-@3@366:
+@4@366:
    ;	
    ;	     }
    ;	}
@@ -163,7 +184,7 @@ _puts	proc	near
 	pop	bp
 	ret	
 _puts	endp
-	?debug	C E9136F3927112E5C494E434C5544455C737464696E2E68
+	?debug	C E9E34B5357112E5C494E434C5544455C737464696E2E68
    ;	
    ;	char getch (void)
    ;	
@@ -257,7 +278,7 @@ _gets	proc	near
 	pop	bp
 	ret	
 _gets	endp
-	?debug	C E9CEA449270E2E5C494E434C5544455C6D6D2E68
+	?debug	C E9E34B53570E2E5C494E434C5544455C6D6D2E68
    ;	
    ;	 addr malloc (unsigned int paragraph)
    ;	
@@ -355,7 +376,7 @@ _avail	proc	near
    ;	
 	ret	
 _avail	endp
-	?debug	C E90D7FEF2A102E5C494E434C5544455C66696C652E68
+	?debug	C E9B151BF58102E5C494E434C5544455C66696C652E68
    ;	
    ;	 handle fopen (char* fname)
    ;	
@@ -822,6 +843,18 @@ _exec	proc	near
 	pop	eax
 	mov	dword ptr [bp-4],eax
    ;	
+   ;	
+   ;	   asm {
+   ;	       mov      ax,0x0600
+   ;	
+	mov	      ax,00600H
+   ;	
+   ;	       int      0x46
+   ;	
+	int	      046H
+   ;	
+   ;	      }
+   ;	      
    ;	  asm {
    ;	       push     ds
    ;	
@@ -872,20 +905,24 @@ _exec	proc	near
 	pop	      ds
    ;	
    ;	      }
-   ;	 if  ( (check) && (avail() != tm) ) puts ("\n\rwarning: memory no released");
+   ;	 if  ( (!is_xsh()) && (check) && (avail() != tm) ) puts ("\n\rwarning: memory no released");
    ;	
+	call	near ptr MGRP:_is_xsh
+	cbw	
+	or	ax,ax
+	jne	short @18@562
 	cmp	byte ptr [bp+10],0
-	je	short @17@478
+	je	short @18@562
 	call	near ptr MGRP:_avail
 	push	dx
 	push	ax
 	pop	eax
 	cmp	eax,dword ptr [bp-4]
-	je	short @17@478
+	je	short @18@562
 	push	offset MGRP:s@
 	call	near ptr MGRP:_puts
 	pop	cx
-@17@478:
+@18@562:
    ;	
    ;	 }
    ;	
@@ -893,7 +930,7 @@ _exec	proc	near
 	leave	
 	ret	
 _exec	endp
-	?debug	C E92E9642270F2E5C494E434C5544455C6469722E68
+	?debug	C E9E34B53570F2E5C494E434C5544455C6469722E68
    ;	
    ;	 char mkdir (char* dir)
    ;	
@@ -1101,8 +1138,8 @@ _acdir	proc	near
    ;	
 	ret	
 _acdir	endp
-	?debug	C E951A31127132E5C494E434C5544455C747970656465662E68
-	?debug	C E901635A2A122E5C494E434C5544455C737472696E672E68
+	?debug	C E9E34B5357132E5C494E434C5544455C747970656465662E68
+	?debug	C E9E34B5357122E5C494E434C5544455C737472696E672E68
    ;	
    ;	  void strcpy (string c, string s)
    ;	
@@ -1120,8 +1157,8 @@ _strcpy	proc	near
    ;	   for (i=0;s[i]!=0;i++) c[i]=s[i];
    ;	
 	mov	cl,0
-	jmp	short @22@114
-@22@58:
+	jmp	short @23@114
+@23@58:
 	mov	al,cl
 	mov	ah,0
 	mov	bx,ax
@@ -1131,12 +1168,12 @@ _strcpy	proc	near
 	mov	bx,dx
 	mov	byte ptr [bx+si],al
 	inc	cl
-@22@114:
+@23@114:
 	mov	al,cl
 	mov	ah,0
 	mov	bx,ax
 	cmp	byte ptr [bx+di],0
-	jne	short @22@58
+	jne	short @23@58
    ;	
    ;	   c[i]=0;
    ;	
@@ -1165,16 +1202,16 @@ _strlen	proc	near
    ;	   for (i=0;s[i]!=0;i++);
    ;	
 	mov	dl,0
-	jmp	short @23@86
-@23@58:
+	jmp	short @24@86
+@24@58:
 	inc	dl
-@23@86:
+@24@86:
 	mov	al,dl
 	mov	ah,0
 	mov	bx,word ptr [bp+4]
 	add	bx,ax
 	cmp	byte ptr [bx],0
-	jne	short @23@58
+	jne	short @24@58
    ;	
    ;	   return i;
    ;	
@@ -1230,10 +1267,10 @@ _strcmp	proc	near
    ;	   for (i=0;((a[i]==b[i])&&(a[i]!=0)&&(b[i]!=0));i++);
    ;	
 	mov	byte ptr [bp-1],0
-	jmp	short @25@86
-@25@58:
+	jmp	short @26@86
+@26@58:
 	inc	byte ptr [bp-1]
-@25@86:
+@26@86:
 	mov	al,byte ptr [bp-1]
 	mov	ah,0
 	mov	bx,cx
@@ -1243,19 +1280,19 @@ _strcmp	proc	near
 	mov	dh,0
 	mov	bx,dx
 	cmp	al,byte ptr [bx+si]
-	jne	short @25@170
+	jne	short @26@170
 	mov	al,byte ptr [bp-1]
 	mov	ah,0
 	mov	bx,cx
 	add	bx,ax
 	cmp	byte ptr [bx],0
-	je	short @25@170
+	je	short @26@170
 	mov	al,byte ptr [bp-1]
 	mov	ah,0
 	mov	bx,ax
 	cmp	byte ptr [bx+si],0
-	jne	short @25@58
-@25@170:
+	jne	short @26@58
+@26@170:
    ;	
    ;	   if ( (i==strlen(a))&&(i==strlen(b))) return 0;
    ;	
@@ -1263,20 +1300,20 @@ _strcmp	proc	near
 	call	near ptr MGRP:_strlen
 	pop	cx
 	cmp	al,byte ptr [bp-1]
-	jne	short @25@254
+	jne	short @26@254
 	push	si
 	call	near ptr MGRP:_strlen
 	pop	cx
 	cmp	al,byte ptr [bp-1]
-	jne	short @25@254
+	jne	short @26@254
 	mov	al,0
-	jmp	short @25@282
-@25@254:
+	jmp	short @26@282
+@26@254:
    ;	
    ;	   else return 1;
    ;	
 	mov	al,1
-@25@282:
+@26@282:
    ;	
    ;	  }
    ;	
@@ -1284,7 +1321,7 @@ _strcmp	proc	near
 	leave	
 	ret	
 _strcmp	endp
-	?debug	C E96EBC5627102E5C494E434C5544455C6469736B2E68
+	?debug	C E9E34B5357102E5C494E434C5544455C6469736B2E68
    ;	
    ;	void get_disk_state (struct disk_state* diskstate)
    ;	
@@ -1383,7 +1420,7 @@ _change_disk	proc	near
 	pop	bp
 	ret	
 _change_disk	endp
-	?debug	C E9B07683270E2E5C494E434C5544455C6C732E68
+	?debug	C E9E34B53570E2E5C494E434C5544455C6C732E68
 _lastf	label	word
 	db	0
 	db	0
@@ -1493,7 +1530,7 @@ _fcb_dir	proc	near
 	pop	bp
 	ret	
 _fcb_dir	endp
-	?debug	C E96FA05627112E5C494E434C5544455C6469736B322E68
+	?debug	C E9E34B5357112E5C494E434C5544455C6469736B322E68
    ;	
    ;	  bool reset_disk (uchar d)
    ;	
@@ -2019,7 +2056,7 @@ _absolute_disk_access	proc	near
    ;	  if (stat == 6) stat = disk_access (d,(uint)h,(uint)c,(uint)s,count,(void*)ofs,seg,op);
    ;	
 	cmp	dl,6
-	jne	short @35@86
+	jne	short @36@86
 	push	si
 	push	word ptr [bp+14]
 	push	word ptr [bp+16]
@@ -2032,12 +2069,12 @@ _absolute_disk_access	proc	near
 	call	near ptr MGRP:_disk_access
 	add	sp,16
 	mov	dl,al
-@35@86:
+@36@86:
    ;	
    ;	  if (stat == 6) stat = disk_access (d,(uint)h,(uint)c,(uint)s,count,(void*)ofs,seg,op);
    ;	
 	cmp	dl,6
-	jne	short @35@142
+	jne	short @36@142
 	push	si
 	push	word ptr [bp+14]
 	push	word ptr [bp+16]
@@ -2050,7 +2087,7 @@ _absolute_disk_access	proc	near
 	call	near ptr MGRP:_disk_access
 	add	sp,16
 	mov	dl,al
-@35@142:
+@36@142:
    ;	
    ;	  return stat;
    ;	
@@ -2063,7 +2100,7 @@ _absolute_disk_access	proc	near
 	leave	
 	ret	
 _absolute_disk_access	endp
-	?debug	C E997A86427112E5C494E434C5544455C6C6F67696E2E68
+	?debug	C E9E34B5357112E5C494E434C5544455C6C6F67696E2E68
    ;	
    ;	void login (unsigned int segl, unsigned int ofs)
    ;	
@@ -2160,7 +2197,7 @@ _login	proc	near
 	pop	bp
 	ret	
 _login	endp
-	?debug	C E958571D27122E5C494E434C5544455C6D656D6F72792E68
+	?debug	C E9E34B5357122E5C494E434C5544455C6D656D6F72792E68
    ;	
    ;	void memcpy (uint segc,uint ofsc,uint segs,uint ofss,uint count)
    ;	
@@ -2335,7 +2372,7 @@ _memset	proc	near
 	pop	bp
 	ret	
 _memset	endp
-	?debug	C E9407A42270F2E5C494E434C5544455C6172672E68
+	?debug	C E9E34B53570F2E5C494E434C5544455C6172672E68
    ;	
    ;	char* get_argz (char* line,int count)
    ;	
@@ -2357,8 +2394,8 @@ _get_argz	proc	near
    ;	 for (i=0;i<=50;i++)
    ;	
 	mov	dl,0
-	jmp	short @39@282
-@39@58:
+	jmp	short @40@282
+@40@58:
    ;	
    ;	 {
    ;	  if (line[i]!=32) { for (j=i;(line[j]!=32)&&(line[j]!=0);j++);line[j]=0;
@@ -2367,23 +2404,23 @@ _get_argz	proc	near
 	mov	ah,0
 	mov	bx,ax
 	cmp	byte ptr [bx+si],32
-	je	short @39@254
+	je	short @40@254
 	mov	cl,dl
-	jmp	short @39@142
-@39@114:
+	jmp	short @40@142
+@40@114:
 	inc	cl
-@39@142:
+@40@142:
 	mov	al,cl
 	mov	ah,0
 	mov	bx,ax
 	cmp	byte ptr [bx+si],32
-	je	short @39@198
+	je	short @40@198
 	mov	al,cl
 	mov	ah,0
 	mov	bx,ax
 	cmp	byte ptr [bx+si],0
-	jne	short @39@114
-@39@198:
+	jne	short @40@114
+@40@198:
 	mov	al,cl
 	mov	ah,0
 	mov	bx,ax
@@ -2397,17 +2434,17 @@ _get_argz	proc	near
    ;			     if (intern_count==count) break ;
    ;	
 	cmp	di,word ptr [bp+6]
-	je	short @39@310
+	je	short @40@310
    ;	
    ;			     i=j;}
    ;	
 	mov	dl,cl
-@39@254:
+@40@254:
 	inc	dl
-@39@282:
+@40@282:
 	cmp	dl,50
-	jbe	short @39@58
-@39@310:
+	jbe	short @40@58
+@40@310:
    ;	
    ;	 }
    ;	return (line+i);
@@ -2426,7 +2463,7 @@ _get_argz	proc	near
 	pop	bp
 	ret	
 _get_argz	endp
-	?debug	C E973A2C9280F2E5C494E434C5544455C7069632E68
+	?debug	C E9AD79BE580F2E5C494E434C5544455C7069632E68
    ;	
    ;	void mode13 (void)
    ;	
@@ -2594,7 +2631,7 @@ _peek	endp
    ;	
 	assume	cs:MGRP
 _pic	proc	near
-	enter	8,0
+	enter	18,0
 	push	si
 	push	di
    ;	
@@ -2608,12 +2645,26 @@ _pic	proc	near
    ;	unsigned int picx=0,picy=200;
    ;	
 	xor	si,si
-	mov	word ptr [bp-6],200
+	mov	di,200
    ;	
    ;	signed char picj=0;
    ;	
+	mov	byte ptr [bp-7],0
    ;	
    ;	unsigned char pixel;
+   ;	unsigned int colors = 1;
+   ;	
+	mov	word ptr [bp-10],1
+   ;	
+   ;	unsigned int sizeBuffer = 8000;
+   ;	
+	mov	word ptr [bp-12],8000
+   ;	
+   ;	unsigned int sizeHeader = 62;
+   ;	
+	mov	word ptr [bp-14],62
+   ;	
+   ;	unsigned char red, green, blue;
    ;	
    ;	 stream = fopen (picname);
    ;	
@@ -2628,12 +2679,78 @@ _pic	proc	near
    ;	 if (stream < 2) return;
    ;	
 	cmp	dword ptr [bp-4],large 2
-	jb	short @44@422
+	jae short	@@0
+	jmp	@45@1654
+@@0:
    ;	
-   ;	 fread (stream,8062,0,0x9000);
+   ;	 if (fsize(stream) > (sizeBuffer + sizeHeader)) {
+   ;	
+	push	dword ptr [bp-4]
+	call	near ptr MGRP:_fsize
+	push	dx
+	push	ax
+	pop	eax
+	add	sp,4
+	mov	dx,word ptr [bp-12]
+	add	dx,word ptr [bp-14]
+	movzx	edx,dx
+	cmp	eax,edx
+	jbe	short @45@114
+   ;	
+   ;	    colors = 16;
+   ;	
+	mov	word ptr [bp-10],16
+   ;	
+   ;	    sizeBuffer = 32000;
+   ;	
+	mov	word ptr [bp-12],32000
+   ;	
+   ;	    sizeHeader = 118;
+   ;	
+	mov	word ptr [bp-14],118
+@45@114:
+   ;	
+   ;	 }   
+   ;	 if (fsize(stream) > (sizeBuffer + sizeHeader)) {
+   ;	
+	push	dword ptr [bp-4]
+	call	near ptr MGRP:_fsize
+	push	dx
+	push	ax
+	pop	eax
+	add	sp,4
+	mov	dx,word ptr [bp-12]
+	add	dx,word ptr [bp-14]
+	movzx	edx,dx
+	cmp	eax,edx
+	jbe	short @45@170
+   ;	
+   ;	    colors = 256;
+   ;	
+	mov	word ptr [bp-10],256
+   ;	
+   ;	    sizeBuffer = 48000;
+   ;	
+	mov	word ptr [bp-12],00000BB80h
+   ;	
+   ;	    sizeHeader = 1078;
+   ;	
+	mov	word ptr [bp-14],1078
+   ;	
+   ;	    picy = 160;
+   ;	
+	mov	di,160
+@45@170:
+   ;	
+   ;	 } 
+   ;	     
+   ;	 fread (stream,sizeBuffer + sizeHeader,0,0x9000);
    ;	
 	push	large 090000000h
-	push	large 8062
+	mov	ax,word ptr [bp-12]
+	add	ax,word ptr [bp-14]
+	movzx	eax,ax
+	push	eax
 	push	dword ptr [bp-4]
 	call	near ptr MGRP:_fread
 	add	sp,12
@@ -2643,23 +2760,29 @@ _pic	proc	near
    ;	
 	call	near ptr MGRP:_mode13
    ;	
-   ;	 for (pici=0;pici<=8000;pici++)
+   ;	 for (pici=0;pici<=sizeBuffer;pici++)
    ;	
-	xor	di,di
-	jmp	short @44@310
-@44@86:
+	mov	word ptr [bp-6],0
+	jmp	@45@1542
+@45@198:
    ;	
    ;	 {
-   ;	  for (picj=0;picj<=7;picj++)
+   ;	  if (colors == 1)
+   ;	
+	cmp	word ptr [bp-10],1
+	jne	short @45@422
+   ;	
+   ;	  {
+   ;	      for (picj=0;picj<=7;picj++)
    ;	
 	mov	byte ptr [bp-7],0
-	jmp	short @44@254
-@44@114:
+	jmp	short @45@394
+@45@254:
    ;	
-   ;	   {
-   ;	    pixel = (peek(pici+62) & (128>>picj));
+   ;	       {
+   ;	        pixel = (peek(pici+62) & (128>>picj));
    ;	
-	mov	ax,di
+	mov	ax,word ptr [bp-6]
 	add	ax,62
 	push	ax
 	call	near ptr MGRP:_peek
@@ -2668,56 +2791,421 @@ _pic	proc	near
 	mov	cl,byte ptr [bp-7]
 	sar	dx,cl
 	and	al,dl
-	mov	dl,al
+	mov	byte ptr [bp-8],al
    ;	
-   ;	    if (pixel) pixel = 7;
+   ;	        if (pixel) pixel = 7;
    ;	
-	or	dl,dl
-	je	short @44@170
-	mov	dl,7
-@44@170:
+	cmp	byte ptr [bp-8],0
+	je	short @45@310
+	mov	byte ptr [bp-8],7
+@45@310:
    ;	
-   ;	    putpixel (picx,picy,pixel );
+   ;	        putpixel (picx,picy,pixel );
    ;	
-	push	dx
-	push	word ptr [bp-6]
+	mov	al,byte ptr [bp-8]
+	push	ax
+	push	di
 	push	si
 	call	near ptr MGRP:_putpixel
 	add	sp,6
    ;	
-   ;	    picx++;
+   ;	        picx++;
    ;	
 	inc	si
    ;	
-   ;	    if (picx==320) { picy--;picx=0;}
+   ;	        if (picx==320) { picy--;picx=0;}
    ;	
 	cmp	si,320
-	jne	short @44@226
-	dec	word ptr [bp-6]
+	jne	short @45@366
+	dec	di
 	xor	si,si
-@44@226:
+@45@366:
 	inc	byte ptr [bp-7]
-@44@254:
+@45@394:
 	cmp	byte ptr [bp-7],7
-	jle	short @44@114
-	inc	di
-@44@310:
-	cmp	di,8000
-	jbe	short @44@86
+	jle	short @45@254
+@45@422:
    ;	
+   ;	       }
    ;	   }
+   ;	   if (colors == 16)
+   ;	
+	cmp	word ptr [bp-10],16
+	je short	@@1
+	jmp	@45@1122
+@@1:
+   ;	
+   ;	  {
+   ;	        
+   ;	        pixel = (peek(pici+sizeHeader) & 0xf0) >> 4 ;
+   ;	
+	mov	ax,word ptr [bp-6]
+	add	ax,word ptr [bp-14]
+	push	ax
+	call	near ptr MGRP:_peek
+	pop	cx
+	cbw	
+	and	ax,240
+	sar	ax,4
+	mov	byte ptr [bp-8],al
+   ;	
+   ;	        red = peek(0x36 + 2 + (pixel * 4)) >> 2;
+   ;	
+	mov	ah,0
+	shl	ax,2
+	add	ax,56
+	push	ax
+	call	near ptr MGRP:_peek
+	pop	cx
+	cbw	
+	sar	ax,2
+	mov	byte ptr [bp-15],al
+   ;	
+   ;	        green = peek(0x36 + 1 + (pixel * 4)) >> 2;
+   ;	
+	mov	al,byte ptr [bp-8]
+	mov	ah,0
+	shl	ax,2
+	add	ax,55
+	push	ax
+	call	near ptr MGRP:_peek
+	pop	cx
+	cbw	
+	sar	ax,2
+	mov	byte ptr [bp-16],al
+   ;	
+   ;	        blue = peek(0x36 + 0 + (pixel * 4)) >> 2;
+   ;	
+	mov	al,byte ptr [bp-8]
+	mov	ah,0
+	shl	ax,2
+	add	ax,54
+	push	ax
+	call	near ptr MGRP:_peek
+	pop	cx
+	cbw	
+	sar	ax,2
+	mov	byte ptr [bp-17],al
+   ;	
+   ;	        asm {
+   ;	            // Set entry 4
+   ;	mov dx, 0x3c8
+   ;	
+	mov	 dx, 03c8H
+   ;	
+   ;	mov al, pixel
+   ;	
+	mov	 al, [bp-8]
+   ;	
+   ;	out dx, al
+   ;	
+	out	 dx, al
+   ;	
+   ;	
+   ;	inc dx
+   ;	
+	inc	 dx
+   ;	
+   ;	mov al, red 
+   ;	
+	mov	 al, [bp-15] 
+   ;	
+   ;	out dx, al
+   ;	
+	out	 dx, al
+   ;	
+   ;	mov al, green
+   ;	
+	mov	 al, [bp-16]
+   ;	
+   ;	out dx, al
+   ;	
+	out	 dx, al
+   ;	
+   ;	mov al, blue
+   ;	
+	mov	 al, [bp-17]
+   ;	
+   ;	out dx, al
+   ;	
+	out	 dx, al
+   ;	
+   ;	        }
+   ;	        
+   ;	        putpixel (picx,picy,pixel );
+   ;	
+	mov	al,byte ptr [bp-8]
+	push	ax
+	push	di
+	push	si
+	call	near ptr MGRP:_putpixel
+	add	sp,6
+   ;	
+   ;	        picx++;
+   ;	
+	inc	si
+   ;	
+   ;	        
+   ;	        pixel = (peek(pici+sizeHeader) & 0x0f);
+   ;	
+	mov	ax,word ptr [bp-6]
+	add	ax,word ptr [bp-14]
+	push	ax
+	call	near ptr MGRP:_peek
+	pop	cx
+	and	al,15
+	mov	byte ptr [bp-8],al
+   ;	
+   ;	        red = peek(0x36 + 2 + (pixel * 4)) >> 2;
+   ;	
+	mov	ah,0
+	shl	ax,2
+	add	ax,56
+	push	ax
+	call	near ptr MGRP:_peek
+	pop	cx
+	cbw	
+	sar	ax,2
+	mov	byte ptr [bp-15],al
+   ;	
+   ;	        green = peek(0x36 + 1 + (pixel * 4)) >> 2;
+   ;	
+	mov	al,byte ptr [bp-8]
+	mov	ah,0
+	shl	ax,2
+	add	ax,55
+	push	ax
+	call	near ptr MGRP:_peek
+	pop	cx
+	cbw	
+	sar	ax,2
+	mov	byte ptr [bp-16],al
+   ;	
+   ;	        blue = peek(0x36 + 0 + (pixel * 4)) >> 2;
+   ;	
+	mov	al,byte ptr [bp-8]
+	mov	ah,0
+	shl	ax,2
+	add	ax,54
+	push	ax
+	call	near ptr MGRP:_peek
+	pop	cx
+	cbw	
+	sar	ax,2
+	mov	byte ptr [bp-17],al
+   ;	
+   ;	        asm {
+   ;	            // Set entry 4
+   ;	mov dx, 0x3c8
+   ;	
+	mov	 dx, 03c8H
+   ;	
+   ;	mov al, pixel
+   ;	
+	mov	 al, [bp-8]
+   ;	
+   ;	out dx, al
+   ;	
+	out	 dx, al
+   ;	
+   ;	
+   ;	inc dx
+   ;	
+	inc	 dx
+   ;	
+   ;	mov al, red 
+   ;	
+	mov	 al, [bp-15] 
+   ;	
+   ;	out dx, al
+   ;	
+	out	 dx, al
+   ;	
+   ;	mov al, green
+   ;	
+	mov	 al, [bp-16]
+   ;	
+   ;	out dx, al
+   ;	
+	out	 dx, al
+   ;	
+   ;	mov al, blue
+   ;	
+	mov	 al, [bp-17]
+   ;	
+   ;	out dx, al
+   ;	
+	out	 dx, al
+   ;	
+   ;	        }
+   ;	        putpixel (picx,picy,pixel );
+   ;	
+	mov	al,byte ptr [bp-8]
+	push	ax
+	push	di
+	push	si
+	call	near ptr MGRP:_putpixel
+	add	sp,6
+   ;	
+   ;	        picx++;
+   ;	
+	inc	si
+   ;	
+   ;	        
+   ;	        if (picx==320) { picy--;picx=0;}
+   ;	
+	cmp	si,320
+	jne	short @45@1122
+	dec	di
+	xor	si,si
+@45@1122:
+   ;	
+   ;	  }
+   ;	  
+   ;	  if (colors == 256)
+   ;	
+	cmp	word ptr [bp-10],256
+	je short	@@2
+	jmp	@45@1514
+@@2:
+   ;	
+   ;	  {
+   ;	        
+   ;	        pixel = peek(pici+sizeHeader);
+   ;	
+	mov	ax,word ptr [bp-6]
+	add	ax,word ptr [bp-14]
+	push	ax
+	call	near ptr MGRP:_peek
+	pop	cx
+	mov	byte ptr [bp-8],al
+   ;	
+   ;	        red = peek(0x36 + 2 + (pixel * 4)) >> 2;
+   ;	
+	mov	ah,0
+	shl	ax,2
+	add	ax,56
+	push	ax
+	call	near ptr MGRP:_peek
+	pop	cx
+	cbw	
+	sar	ax,2
+	mov	byte ptr [bp-15],al
+   ;	
+   ;	        green = peek(0x36 + 1 + (pixel * 4)) >> 2;
+   ;	
+	mov	al,byte ptr [bp-8]
+	mov	ah,0
+	shl	ax,2
+	add	ax,55
+	push	ax
+	call	near ptr MGRP:_peek
+	pop	cx
+	cbw	
+	sar	ax,2
+	mov	byte ptr [bp-16],al
+   ;	
+   ;	        blue = peek(0x36 + 0 + (pixel * 4)) >> 2;
+   ;	
+	mov	al,byte ptr [bp-8]
+	mov	ah,0
+	shl	ax,2
+	add	ax,54
+	push	ax
+	call	near ptr MGRP:_peek
+	pop	cx
+	cbw	
+	sar	ax,2
+	mov	byte ptr [bp-17],al
+   ;	
+   ;	        asm {
+   ;	            // Set entry 4
+   ;	mov dx, 0x3c8
+   ;	
+	mov	 dx, 03c8H
+   ;	
+   ;	mov al, pixel
+   ;	
+	mov	 al, [bp-8]
+   ;	
+   ;	out dx, al
+   ;	
+	out	 dx, al
+   ;	
+   ;	
+   ;	inc dx
+   ;	
+	inc	 dx
+   ;	
+   ;	mov al, red 
+   ;	
+	mov	 al, [bp-15] 
+   ;	
+   ;	out dx, al
+   ;	
+	out	 dx, al
+   ;	
+   ;	mov al, green
+   ;	
+	mov	 al, [bp-16]
+   ;	
+   ;	out dx, al
+   ;	
+	out	 dx, al
+   ;	
+   ;	mov al, blue
+   ;	
+	mov	 al, [bp-17]
+   ;	
+   ;	out dx, al
+   ;	
+	out	 dx, al
+   ;	
+   ;	        }
+   ;	        
+   ;	        putpixel (picx,picy,pixel );
+   ;	
+	mov	al,byte ptr [bp-8]
+	push	ax
+	push	di
+	push	si
+	call	near ptr MGRP:_putpixel
+	add	sp,6
+   ;	
+   ;	        picx++;
+   ;	
+	inc	si
+   ;	
+   ;	        
+   ;	        if (picx==300) { picy--;picx=0;}
+   ;	
+	cmp	si,300
+	jne	short @45@1514
+	dec	di
+	xor	si,si
+@45@1514:
+	inc	word ptr [bp-6]
+@45@1542:
+	mov	ax,word ptr [bp-6]
+	cmp	ax,word ptr [bp-12]
+	ja short	@@3
+	jmp	@45@198
+@@3:
+   ;	
+   ;	  }
+   ;	   
    ;	 }
    ;	 if (p=='p') getch ();
    ;	
 	cmp	byte ptr [bp+6],112
-	jne	short @44@394
+	jne	short @45@1626
 	call	near ptr MGRP:_getch
-@44@394:
+@45@1626:
    ;	
    ;	 mode3();
    ;	
 	call	near ptr MGRP:_mode3
-@44@422:
+@45@1654:
    ;	
    ;	} 
    ;	
@@ -2847,8 +3335,8 @@ _writedword	proc	near
    ;	 for (i=1000000000;i!=0;i/=10)
    ;	
 	mov	dword ptr [bp-4],large 03B9ACA00h
-	jmp	short @46@226
-@46@58:
+	jmp	short @47@226
+@47@58:
    ;	
    ;	 {
    ;	 b = dw / i ; dw = dw - (b*i) ;
@@ -2867,30 +3355,30 @@ _writedword	proc	near
    ;	 if (b) flag = 1;
    ;	
 	or	bl,bl
-	je	short @46@114
+	je	short @47@114
 	mov	si,1
-@46@114:
+@47@114:
    ;	
    ;	 if ( flag  && isecho)  putc (b+48) ;
    ;	
 	or	si,si
-	je	short @46@198
+	je	short @47@198
 	cmp	word ptr MGRP:_isecho,0
-	je	short @46@198
+	je	short @47@198
 	mov	al,bl
 	add	al,48
 	push	ax
 	call	near ptr MGRP:_putc
 	pop	cx
-@46@198:
+@47@198:
 	mov	ebx,large 10
 	mov	eax,dword ptr [bp-4]
 	xor	edx,edx
 	div	ebx
 	mov	dword ptr [bp-4],eax
-@46@226:
+@47@226:
 	cmp	dword ptr [bp-4],large 0
-	jne	short @46@58
+	jne	short @47@58
    ;	
    ;	 }
    ;	}
@@ -2899,27 +3387,6 @@ _writedword	proc	near
 	leave	
 	ret	
 _writedword	endp
-   ;	
-   ;	char is_xsh (void)
-   ;	
-	assume	cs:MGRP
-_is_xsh	proc	near
-   ;	
-   ;	{
-   ;	 asm {
-   ;	        mov ah,4
-   ;	
-	mov	 ah,4
-   ;	
-   ;	        int 0x46
-   ;	
-	int	 046H
-   ;	
-   ;	     }
-   ;	}
-   ;	
-	ret	
-_is_xsh	endp
    ;	
    ;	void cputc (char c, char color)
    ;	
@@ -3123,9 +3590,9 @@ _dir	proc	near
 	mov	bx,word ptr [bp-8]
 	shl	bx,5
 	cmp	byte ptr MGRP:_cluster_buffer[bx],0
-	jne short	@@0
+	jne short	@@4
 	jmp	@50@534
-@@0:
+@@4:
    ;	
    ;	     {
    ;	      counter++;
@@ -3138,9 +3605,9 @@ _dir	proc	near
 	shl	bx,5
 	mov	eax,dword ptr MGRP:_cluster_buffer[bx+16]
 	cmp	eax,dword ptr [bp-12]
-	je short	@@1
+	je short	@@5
 	jmp	@50@534
-@@1:
+@@5:
    ;	
    ;							  {
    ;							   if (cluster_buffer[j].f_attr==0xa)
@@ -3241,9 +3708,9 @@ _dir	proc	near
 	inc	dword ptr [bp-8]
 @50@562:
 	cmp	dword ptr [bp-8],large 15
-	ja short	@@2
+	ja short	@@6
 	jmp	@50@86
-@@2:
+@@6:
 @50@590:
    ;	
    ;							  }
@@ -3261,9 +3728,9 @@ _dir	proc	near
 	inc	dword ptr [bp-4]
 @50@646:
 	cmp	dword ptr [bp-4],large 218
-	ja short	@@3
+	ja short	@@7
 	jmp	@50@58
-@@3:
+@@7:
 @50@674:
    ;	
    ;	   }
@@ -3451,9 +3918,9 @@ _syst	proc	near
 	call	near ptr MGRP:_absolute_disk_access
 	add	sp,14
 	or	al,al
-	je short	@@4
+	je short	@@8
 	jmp	@52@422
-@@4:
+@@8:
    ;	
    ;	  sector [509] = dr;
    ;	
@@ -3638,9 +4105,9 @@ _process	proc	near
    ;	 if (dir[0] == '/') { prompt[0] = '/'; prompt [1] = 0; i++;};
    ;	
 	cmp	byte ptr [si],47
-	je short	@@5
+	je short	@@9
 	jmp	@54@422
-@@5:
+@@9:
 	mov	byte ptr [di],47
 	mov	byte ptr [di+1],0
 	jmp	@54@394
@@ -3767,9 +4234,9 @@ _process	proc	near
 	call	near ptr MGRP:_strlen
 	pop	cx
 	cmp	al,byte ptr [bp-1]
-	jb short	@@6
+	jb short	@@10
 	jmp	@54@86
-@@6:
+@@10:
    ;	
    ;	 }
    ;	}
@@ -3992,9 +4459,9 @@ _doCmd	proc	near
 	pop	cx
 	cbw	
 	or	ax,ax
-	je short	@@7
+	je short	@@11
 	jmp	@56@3082
-@@7:
+@@11:
 @56@282:
 	push	offset MGRP:ERROR
 	jmp	@56@3026
@@ -4025,9 +4492,9 @@ _doCmd	proc	near
 	pop	cx
 	cbw	
 	or	ax,ax
-	je short	@@8
+	je short	@@12
 	jmp	@56@3082
-@@8:
+@@12:
 	jmp	short @56@282
 @56@394:
    ;	
@@ -4140,9 +4607,9 @@ _doCmd	proc	near
 	add	sp,4
 	mov	ah,0
 	or	ax,ax
-	jne short	@@9
+	jne short	@@13
 	jmp	@56@3082
-@@9:
+@@13:
    ;	
    ;	   else if (!strcmp ((string)get_argz(cmd,1),"#"));
    ;	
@@ -4156,11 +4623,11 @@ _doCmd	proc	near
 	add	sp,4
 	mov	ah,0
 	or	ax,ax
-	jne short	@@10
+	jne short	@@14
 	jmp	@56@3082
-@@10:
+@@14:
    ;	
-   ;	   else if (!strcmp ((string)get_argz(cmd,1),"ver")) { puts (nl); puts (nl); puts ("QuickDreamOS Version 0.4"); puts (nl); puts 
+   ;	   else if (!strcmp ((string)get_argz(cmd,1),"ver")) { puts (nl); puts (nl); puts ("QuickDreamOS Version 0.5"); puts (nl); puts 
    ;	
 	push	offset MGRP:s@+200
 	push	1
@@ -4232,9 +4699,9 @@ _doCmd	proc	near
 	add	sp,4
 	mov	ah,0
 	or	ax,ax
-	je short	@@11
+	je short	@@15
 	jmp	@56@3082
-@@11:
+@@15:
 	mov	byte ptr MGRP:iscolor,0
 	jmp	@56@3082
 @56@758:
@@ -4330,9 +4797,9 @@ _doCmd	proc	near
    ;							       if (file1 <2) return;
    ;	
 	cmp	dword ptr MGRP:_file1,large 2
-	jae short	@@12
+	jae short	@@16
 	jmp	@56@3082
-@@12:
+@@16:
    ;	
    ;							       else writedword (fsize(file1));
    ;	
@@ -4361,9 +4828,9 @@ _doCmd	proc	near
 	call	near ptr MGRP:_is_xsh
 	cbw	
 	or	ax,ax
-	je short	@@13
+	je short	@@17
 	jmp	@56@3082
-@@13:
+@@17:
 	push	3
 	push	si
 	call	near ptr MGRP:_get_argz
@@ -4433,9 +4900,9 @@ _doCmd	proc	near
 	add	sp,4
 	mov	ah,0
 	or	ax,ax
-	je short	@@14
+	je short	@@18
 	jmp	@56@1346
-@@14:
+@@18:
    ;	
    ;								//puts (nl);
    ;								file1 = fopen (get_argz(cmd,3));
@@ -4455,9 +4922,9 @@ _doCmd	proc	near
    ;								if (file1 <2) return;
    ;	
 	cmp	dword ptr MGRP:_file1,large 2
-	jae short	@@15
+	jae short	@@19
 	jmp	@56@3082
-@@15:
+@@19:
    ;	
    ;								if ( (string)get_argz(cmd,2)[0] == 'x') setattr (file1,0xc);
    ;	
@@ -4503,9 +4970,9 @@ _doCmd	proc	near
 	mov	al,byte ptr [bx]
 	cbw	
 	cmp	ax,115
-	je short	@@16
+	je short	@@20
 	jmp	@56@3082
-@@16:
+@@20:
 	push	13
 	push	dword ptr MGRP:_file1
 	call	near ptr MGRP:_setattr
@@ -4551,9 +5018,9 @@ _doCmd	proc	near
    ;	                                                  if (file1 <2) { puts (ERROR); return;}
    ;	
 	cmp	dword ptr MGRP:_file1,large 2
-	jae short	@@17
+	jae short	@@21
 	jmp	@56@282
-@@17:
+@@21:
    ;	
    ;							  if (!fremove(file1)) puts (success);
    ;	
@@ -4562,9 +5029,9 @@ _doCmd	proc	near
 	add	sp,4
 	cbw	
 	or	ax,ax
-	je short	@@18
+	je short	@@22
 	jmp	@56@3082
-@@18:
+@@22:
 	jmp	@56@2550
 @56@1458:
    ;	
@@ -4585,9 +5052,9 @@ _doCmd	proc	near
 	call	near ptr MGRP:_is_xsh
 	cbw	
 	or	ax,ax
-	je short	@@19
+	je short	@@23
 	jmp	@56@3082
-@@19:
+@@23:
  	mov	 ax,3 
  	int	 010H 
 	jmp	@56@3082
@@ -4749,9 +5216,9 @@ _doCmd	proc	near
 	add	sp,4
 	mov	bx,ax
 	cmp	byte ptr [bx],99
-	je short	@@20
+	je short	@@24
 	jmp	@56@3082
-@@20:
+@@24:
 	push	128
 	call	near ptr MGRP:_format_disk
 	jmp	@56@3054
@@ -4770,9 +5237,9 @@ _doCmd	proc	near
 	add	sp,4
 	mov	ah,0
 	or	ax,ax
-	jne short	@@21
+	jne short	@@25
 	jmp	@56@3082
-@@21:
+@@25:
    ;	
    ;	   else if (!strcmp ((string)get_argz(cmd,1),"c:")) {
    ;	
@@ -4897,9 +5364,9 @@ _doCmd	proc	near
 	add	sp,4
 	mov	bx,ax
 	cmp	byte ptr [bx],99
-	je short	@@22
+	je short	@@26
 	jmp	@56@3082
-@@22:
+@@26:
 	push	128
 	call	near ptr MGRP:_syst
 	jmp	@56@3054
@@ -4918,9 +5385,9 @@ _doCmd	proc	near
 	add	sp,4
 	mov	ah,0
 	or	ax,ax
-	je short	@@23
+	je short	@@27
 	jmp	@56@2578
-@@23:
+@@27:
    ;	
    ;	
    ;							  file1 = fopen (get_argz(cmd,2));
@@ -4946,9 +5413,9 @@ _doCmd	proc	near
    ;							  if (file1 <2) { puts (ERROR);
    ;	
 	cmp	dword ptr MGRP:_file1,large 2
-	jae short	@@24
+	jae short	@@28
 	jmp	@56@282
-@@24:
+@@28:
    ;	
    ;									  return;
    ;	
@@ -4976,9 +5443,9 @@ _doCmd	proc	near
    ;							  if (file2 <2) { puts (ERROR);
    ;	
 	cmp	dword ptr MGRP:_file2,large 2
-	jae short	@@25
+	jae short	@@29
 	jmp	@56@282
-@@25:
+@@29:
    ;	
    ;									  return;
    ;									}
@@ -4994,9 +5461,9 @@ _doCmd	proc	near
 	call	near ptr MGRP:_fread
 	add	sp,12
 	or	ax,ax
-	jne short	@@26
+	jne short	@@30
 	jmp	@56@282
-@@26:
+@@30:
    ;	
    ;							  if (!fwrite (file2,fsize(file1),0,0x9000)) {puts (ERROR); return;}
    ;	
@@ -5010,9 +5477,9 @@ _doCmd	proc	near
 	call	near ptr MGRP:_fwrite
 	add	sp,12
 	or	ax,ax
-	jne short	@@27
+	jne short	@@31
 	jmp	@56@282
-@@27:
+@@31:
 @56@2550:
 	push	offset MGRP:success
 	jmp	@56@3026
@@ -5033,9 +5500,9 @@ _doCmd	proc	near
 	add	sp,4
 	mov	ah,0
 	or	ax,ax
-	jne short	@@28
+	jne short	@@32
 	jmp	@56@3082
-@@28:
+@@32:
    ;	
    ;	  else   {
    ;	
@@ -5069,9 +5536,9 @@ _doCmd	proc	near
    ;		   if (file2 <2) { puts (bad_opcode);
    ;	
 	cmp	dword ptr MGRP:_file2,large 2
-	jae short	@@29
+	jae short	@@33
 	jmp	@56@2998
-@@29:
+@@33:
    ;	
    ;				}
    ;		   else exec (get_argz(cmd,1),_CS,(unsigned int)buf,1);
@@ -5125,9 +5592,9 @@ _doCmd	proc	near
    ;		   if (file2 <2) { puts (bad_opcode);
    ;	
 	cmp	dword ptr MGRP:_file2,large 2
-	jae short	@@30
+	jae short	@@34
 	jmp	@56@2998
-@@30:
+@@34:
    ;	
    ;				}
    ;		   else exec (get_argz(cmd,1)+2,_CS,(unsigned int)buf,1);
@@ -5467,9 +5934,9 @@ _batch	proc	near
    ;	  if (!bufferbatch) return;
    ;	
 	cmp	word ptr MGRP:_bufferbatch,0
-	jne short	@@31
+	jne short	@@35
 	jmp	@60@254
-@@31:
+@@35:
    ;	
    ;	  clearBufferSegment ();
    ;	
@@ -5676,14 +6143,14 @@ _shell	proc	far
 	jmp	short @61@254
 @61@114:
    ;	
-   ;	   else if ( ((string)get_argz(cmdsh,1))[0] == '~') batch ( (string)get_argz(cmdsh,1)+1);
+   ;	   else if ( ((string)get_argz(cmdsh,1))[0] == '$') batch ( (string)get_argz(cmdsh,1)+1);
    ;	
 	push	1
 	push	offset MGRP:_cmdsh
 	call	near ptr MGRP:_get_argz
 	add	sp,4
 	mov	bx,ax
-	cmp	byte ptr [bx],126
+	cmp	byte ptr [bx],36
 	jne	short @61@170
 	push	1
 	push	offset MGRP:_cmdsh
@@ -5737,9 +6204,9 @@ _shell	proc	far
    ;	   if (quit) break;
    ;	
 	cmp	word ptr MGRP:_quit,0
-	jne short	@@32
+	jne short	@@36
 	jmp	@61@30
-@@32:
+@@36:
    ;	
    ;	  }
    ;	 quit = 0;
@@ -5948,7 +6415,7 @@ s@	label	byte
 	db	0
 	db	'ver'
 	db	0
-	db	'QuickDreamOS Version 0.4'
+	db	'QuickDreamOS Version 0.5'
 	db	0
 	db	'color'
 	db	0
@@ -6047,7 +6514,6 @@ VPSEG	ends
 	public	_dir
 	public	_cputs
 	public	_cputc
-	public	_is_xsh
 	public	_writedword
 	public	_get_boot_drive
 	public	_batch
@@ -6118,6 +6584,7 @@ _nl	equ	nl
 	public	_getch
 	public	_puts
 	public	_putc
+	public	_is_xsh
 	public	_isecho
 	public	_startup
 	public	_main

@@ -1,6 +1,14 @@
 
  #include <startup.h>
  int isecho = 1;
+ char is_xsh (void)
+{
+ asm {
+        mov ah,4
+        int 0x46
+     }
+}
+
  #include <stdout.h>
  #include <stdin.h>
  #include <mm.h>
@@ -66,15 +74,6 @@ void writedword (unsigned long dw)
  if ( flag  && isecho)  putc (b+48) ;
  }
 }
-
-char is_xsh (void)
-{
- asm {
-        mov ah,4
-        int 0x46
-     }
-}
-
 
 void cputc (char c, char color)
 {
@@ -277,7 +276,7 @@ void doCmd (char* cmd)
                                                 }
    else if (!strcmp ((string)get_argz(cmd,1),"rem")) ;
    else if (!strcmp ((string)get_argz(cmd,1),"#"));
-   else if (!strcmp ((string)get_argz(cmd,1),"ver")) { puts (nl); puts (nl); puts ("QuickDreamOS Version 0.4"); puts (nl); puts (nl);}
+   else if (!strcmp ((string)get_argz(cmd,1),"ver")) { puts (nl); puts (nl); puts ("QuickDreamOS Version 0.5"); puts (nl); puts (nl);}
    else if (!strcmp ((string)get_argz(cmd,1),"color"))
    {
     if (!strcmp ((string)get_argz(cmd,2),"on")) iscolor =1;
@@ -477,7 +476,7 @@ void doCmd (char* cmd)
    strcpy (buf,cmdsh);
 
    if ( !strcmp ((string)get_argz(cmdsh,1),"make")) batch ("Makefile");
-   else if ( ((string)get_argz(cmdsh,1))[0] == '~') batch ( (string)get_argz(cmdsh,1)+1);
+   else if ( ((string)get_argz(cmdsh,1))[0] == '$') batch ( (string)get_argz(cmdsh,1)+1);
    else if ( ((string)get_argz(cmdsh,1))[0] == '@')
    {
     doCmd (cmdsh+1);

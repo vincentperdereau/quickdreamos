@@ -1,58 +1,119 @@
+ .MODEL TINY
+ .386
 
+
+ .CODE
+
+handler:
 
         xor     ax,ax
 	int	33h
 	cmp	ax,0ffffh
-        jmp     not_loaded
+	jmp     not_loaded
 
-	mov	ah,9
-	mov	dx,offset already_loaded
-	int	21h
+	mov	ah,10h
+	mov	si,offset already_loaded
+	int	44h
 
-	mov	ax,4c01h
-	int	21h
+	retf
 
 not_loaded:
 
-        mov	ah,9
-        mov	dx,offset intro_string
-        int	21h
+        ;mov	ax,2574h
+        ;mov	dx,offset new_isr
+        ;int	21h
 
-        mov	ax,2574h
-        mov	dx,offset new_isr
-        int	21h
-
-        mov	ax,2533h
-        mov	dx,offset new_33
-        int	21h
+        ;mov	ax,2533h
+        ;mov	dx,offset new_33
+        ;int	21h
 
         cli
 
-        mov	bl,0a8h
+        xor ax,ax
+        mov es,ax
+        mov bx,74h * 4
+	mov word ptr es:[bx],offset new_isr
+
+        xor ax,ax
+        mov es,ax
+        mov bx,33h * 4
+	mov word ptr es:[bx],offset new_33
+    
+	mov bx,offset end_of_tsr
+        sub bx,offset handler
+        shr bx,4
+        inc bx
+        mov ah,0012h
+        int 44h
+
+        mov dx,ax
+
+        mov es,ax
+        mov di,0
+        mov ax,cs
+        mov ds,ax
+        mov si,0
+        mov cx,bx
+        shl cx,4
+	inc cx
+        rep movsb
+
+        mov ax,0
+
+        mov dx,cs
+        mov ds,dx
+; vp
+        mov es,ax
+        mov es:[33h*4+2],dx
+
+	mov bx,74h * 4
+	mov es:[bx+2],dx
+
+	mov	bl,0a8h
         call	keyboard_cmd
 
         mov	bl,20h
         call    keyboard_cmd
-        call    keyboard_read
+	call    keyboard_read
+
         or      al,2
         mov     bl,60h
         push    ax
         call    keyboard_cmd
         pop     ax
-        call    keyboard_write
+	call    keyboard_write
 
         mov     bl,0d4h
-        call    keyboard_cmd
-        mov     al,0f4h
+	call    keyboard_cmd
+
+	mov     al,0f4h
         call    keyboard_write
 
-        sti
+	sti
 
-        mov     dx,offset end_of_tsr
-        int     27h
+	mov	ah,10h
+        mov	si,offset intro_string
+	int	44h
 
-intro_string    db 0dh,0ah,'DPSMouseDRV (c) 1998',0dh,0ah,'$'
-already_loaded  db 0dh,0ah,'Mouse driver already loaded!',0dh,0ah,'$'
+
+	mov al,0
+	int 33h
+
+
+	mov al,1
+	int 33h
+inf:
+jmp inf
+
+	retf
+
+        ;sti
+
+        ;mov     dx,offset end_of_tsr
+	;int     27h
+
+intro_string    db 0dh,0ah,'DPSMouseDRV (c) 1998',0dh,0ah,0
+already_loaded  db 0dh,0ah,'Mouse driver already loaded!',0dh,0ah,0
 
 call_user_isr:
         db      60h
@@ -60,11 +121,11 @@ call_user_isr:
         mov     dx,cs:[pos_y]
         mov     di,0 ;cs:[x_move]
         mov     si,0 ;cs:[y_move]
-        mov     w[cs:x_move],0
-        mov     w[cs:y_move],0
+        mov     word [cs:x_move],0
+	mov     word [cs:y_move],0
         mov     bl,cs:[buttons]
         xor     bh,bh
-        call    dword ptr cs:[user_subroutine]
+	call    dword ptr cs:[user_subroutine]
         db      61h
         ret
 
@@ -84,19 +145,21 @@ new_isr:
         pop     ds
 
         mov     bl,0adh
-        call    keyboard_cmd
+	call    keyboard_cmd
 
-        cmp     b[first_time],0
+	cmp     byte [first_time],0
         je      not_first_time
 
-        mov     b[first_time],0
+	mov     byte [first_time],0
         call    keyboard_read
         call    keyboard_read
         call    keyboard_read
-        jmp     no_show
+
+	jmp     no_show
 
 not_first_time:
-        mov     w[temp_mask],0
+
+        mov     word [temp_mask],0
 
         mov     cx,word ptr [offset pos_x]
         mov     dx,word ptr [offset pos_y]
@@ -173,7 +236,7 @@ good_ver2:
         or      ax,[y_move]
         or      ax,ax
         jz      no_change_position
-        or      w[temp_mask],1
+	or      word [temp_mask],1
 no_change_position:
 
         mov     ax,[temp_mask]
@@ -252,7 +315,9 @@ keyboard_read:
         push    cx
         push    dx
         xor     cx,cx
+
 key_read_loop:
+        
         in      al,64h
         jmp     $+2
         jmp     $+2
@@ -264,6 +329,7 @@ key_read_loop:
 key_read_ready:
         push    cx
         mov     cx,32
+
 key_read_delay:
         jmp     $+2
         jmp     $+2
@@ -436,18 +502,18 @@ swap_subroutines:
         jmp     _swap_subroutines
 
 _reset_mouse:
-        mov     b[cs:offset buttons],0
-        mov     w[cs:offset pos_x],0
-        mov     w[cs:offset pos_y],0
-        mov     w[cs:offset x_move],0
-        mov     w[cs:offset y_move],0
-        mov     w[cs:offset x_max],639
-        mov     w[cs:offset x_min],0
-        mov     w[cs:offset y_max],199
-        mov     w[cs:offset y_min],0
-        mov     w[cs:offset user_mask],0
-        mov     w[cs:offset user_subroutine],0
-        mov     w[cs:offset user_subroutine+2],0
+	mov     cs:[offset buttons],0
+        mov     cs:[offset pos_x],0
+	mov     cs:[offset pos_y],0
+        mov     cs:[offset x_move],0
+        mov     cs:[offset y_move],0
+	mov     cs:[offset x_max],639
+	mov     cs:[offset x_min],0
+	mov     cs:[offset y_max],199
+	mov     cs:[offset y_min],0
+	mov     cs:[offset user_mask],0
+	mov     cs:[offset user_subroutine],0
+	mov     cs:[offset user_subroutine+2],0
         mov     ax,0ffffh
         mov     bx,3
         iret
@@ -460,7 +526,7 @@ _get_pos:
         iret
 
 _get_mouse_movement:
-        mov     cx,word ptr cs:[offset x_move]
+	mov     cx,word ptr cs:[offset x_move]
         mov     dx,word ptr cs:[offset y_move]
         mov     word ptr cs:[offset x_move],0
         mov     word ptr cs:[offset y_move],0
@@ -522,8 +588,8 @@ _hide_mouse:
 _set_pos:
         mov     cx,cs:[pos_x]
         mov     dx,cs:[pos_y]
-        mov     w[cs:x_move],0
-        mov     w[cs:y_move],0
+        mov     word [cs:x_move],0
+        mov     word [cs:y_move],0
         iret
 
 _set_hor_pos:
@@ -568,9 +634,9 @@ _set_subroutines:
         iret
 
 _swap_subroutines:
-        push    w[cs:user_mask]
-        push    w[cs:user_subroutine+2]
-        push    w[cs:user_subroutine]
+        push    word [cs:user_mask]
+        push    word [cs:user_subroutine+2]
+	push    word [cs:user_subroutine]
         mov     cs:[user_subroutine],dx
         mov     cs:[user_subroutine+2],es
         mov     cs:[user_mask],cx

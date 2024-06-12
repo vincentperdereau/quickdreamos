@@ -44,6 +44,10 @@ jmp .entry  ; ** jump to the entry point
  int $33   ; 
 
 .lp:
+ mov cx,0
+ mov dx,$3d09
+ mov ah,$86
+ int $15
  mov ax,3  ; ** function 03: get mouse status ( (cx,dx,bx) = (x,y,buttons) )
  int $33
  nop

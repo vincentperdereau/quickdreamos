@@ -6,8 +6,8 @@ sh.bin
  - dans le path: nom_du_prog
 
 # execution de script:
- ~nom_du_script
- (ex: ~install)
+ $nom_du_script
+ (ex: $install)
 
 # terminer un programme: touche F12
 

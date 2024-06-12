@@ -11,3 +11,6 @@
  del *.map
  del *.exe
 
+tinyfs "rm /bin/ved"
+tinyfs "put ved.bin /bin/ved"
+

@@ -15,8 +15,8 @@ $comm	macro	name,dist,size,count
 	endif
 	?debug	V 300h
 	?debug	S "dock.c"
-	?debug	C E90FB8062D06646F636B2E63
-	?debug	C E902B8062D0A717569636B77696E2E68
+	?debug	C E994B3BC5806646F636B2E63
+	?debug	C E9BBB3BC580A717569636B77696E2E68
 VPSEG	segment byte public use16 
 VPSEG	ends
 MGRP	group	VPSEG
@@ -921,6 +921,8 @@ _WinMain	proc	far
    ;	{
    ;	 FuncEntry
    ;	
+ 	cli	 
+ 	pusha	 
 	mov	ax,ds
 	mov	bx,cs
 	mov	ds,bx
@@ -931,39 +933,39 @@ _WinMain	proc	far
    ;	
 	les	bx,dword ptr MGRP:_SysBuf
 	cmp	byte ptr es:[bx+1],193
-	jne	short @26@310
+	jne	short @26@366
    ;	
    ;	 { 
    ;	  if (WM_PARAM == BUTTON_01)
    ;	
 	cmp	byte ptr es:[bx+2],1
-	jne	short @26@86
+	jne	short @26@142
    ;	
    ;	  {
    ;	   FullShell ();
    ;	
 	call	near ptr MGRP:_FullShell
-@26@86:
+@26@142:
    ;	
    ;	  }
    ;	  if (WM_PARAM == BUTTON_02)
    ;	
 	les	bx,dword ptr MGRP:_SysBuf
 	cmp	byte ptr es:[bx+2],2
-	jne	short @26@142
+	jne	short @26@198
    ;	
    ;	  {
    ;	   about ();
    ;	
 	call	near ptr MGRP:_about
-@26@142:
+@26@198:
    ;	
    ;	  }
    ;	  if (WM_PARAM == BUTTON_03)
    ;	
 	les	bx,dword ptr MGRP:_SysBuf
 	cmp	byte ptr es:[bx+2],3
-	jne	short @26@198
+	jne	short @26@254
    ;	
    ;	  {
    ;	   exec ("/qwin/exec",0,0);
@@ -972,33 +974,33 @@ _WinMain	proc	far
 	push	offset MGRP:s@
 	call	near ptr MGRP:_exec
 	add	sp,6
-@26@198:
+@26@254:
    ;	
    ;	  }
    ;	  if (WM_PARAM == BUTTON_04)
    ;	
 	les	bx,dword ptr MGRP:_SysBuf
 	cmp	byte ptr es:[bx+2],4
-	jne	short @26@254
+	jne	short @26@310
    ;	
    ;	  {
    ;	   mem ();
    ;	
 	call	near ptr MGRP:_mem
-@26@254:
+@26@310:
    ;	
    ;	  }
    ;	  if (WM_PARAM == BUTTON_05)
    ;	
 	les	bx,dword ptr MGRP:_SysBuf
 	cmp	byte ptr es:[bx+2],5
-	jne	short @26@310
+	jne	short @26@366
    ;	
    ;	  {
    ;	    halt ();
    ;	
 	call	near ptr MGRP:_halt
-@26@310:
+@26@366:
    ;	
    ;	  }
    ;	 }
@@ -1007,6 +1009,8 @@ _WinMain	proc	far
    ;	
 	mov	ax,word ptr MGRP:DataSegment
 	mov	ds,ax
+ 	popa	 
+ 	sti	 
  	retf	 
    ;	
    ;	}

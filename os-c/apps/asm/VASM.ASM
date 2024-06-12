@@ -15,7 +15,7 @@ $comm	macro	name,dist,size,count
 	endif
 	?debug	V 300h
 	?debug	S "vasm.c"
-	?debug	C E91C571C29067661736D2E63
+	?debug	C E9D6567958067661736D2E63
 VPSEG	segment byte public use16 
 VPSEG	ends
 MGRP	group	VPSEG
@@ -44,8 +44,8 @@ _main	proc	near
    ;	
 	ret	
 _main	endp
-	?debug	C E951A3112709747970656465662E68
-	?debug	C E965635A2A08737472696E672E68
+	?debug	C E9E343535709747970656465662E68
+	?debug	C E9E343535708737472696E672E68
    ;	
    ;	  void strcpy (string c, string s)
    ;	
@@ -227,7 +227,7 @@ _strcmp	proc	near
 	leave	
 	ret	
 _strcmp	endp
-	?debug	C E9E87D8A27056172672E68
+	?debug	C E9E3435357056172672E68
    ;	
    ;	char* get_argz (char* line,int count)
    ;	
@@ -331,7 +331,7 @@ _get_argz	proc	near
 	leave	
 	ret	
 _get_argz	endp
-	?debug	C E9AE996A270666696C652E68
+	?debug	C E9E34353570666696C652E68
    ;	
    ;	 handle fopen (char* fname)
    ;	
@@ -846,7 +846,7 @@ _exec	proc	near
 	pop	bp
 	ret	
 _exec	endp
-	?debug	C E958571D27086D656D6F72792E68
+	?debug	C E9E3435357086D656D6F72792E68
    ;	
    ;	void memcpy (uint segc,uint ofsc,uint segs,uint ofss,uint count)
    ;	
@@ -1151,96 +1151,6 @@ _fgets	proc	near
 	ret	
 _fgets	endp
    ;	
-   ;	 addr malloc (unsigned int paragraph)
-   ;	
-	assume	cs:MGRP
-_malloc	proc	near
-	push	bp
-	mov	bp,sp
-	push	di
-   ;	
-   ;	 {
-   ;	  asm {
-   ;		push bx
-   ;	
-	push	 bx
-   ;	
-   ;	        push cx
-   ;	
-	push	 cx
-   ;	
-   ;	        push di
-   ;	
-	push	 di
-   ;	
-   ;	        push es
-   ;	
-	push	 es
-   ;	
-   ;	        mov ah,0x0012
-   ;	
-	mov	 ah,00012H
-   ;	
-   ;		mov bx,paragraph
-   ;	
-	mov	 bx,[bp+4]
-   ;	
-   ;		int 0x44
-   ;	
-	int	 044H
-   ;	
-   ;	        mov bx,ax
-   ;	
-	mov	 bx,ax
-   ;	
-   ;	        mov es,ax
-   ;	
-	mov	 es,ax
-   ;	
-   ;	        mov di,0
-   ;	
-	mov	 di,0
-   ;	
-   ;	        mov cx,0fff0h
-   ;	
-	mov	 cx,0fff0h
-   ;	
-   ;	        mov ax,0
-   ;	
-	mov	 ax,0
-   ;	
-   ;	        rep stosb
-   ;	
-	rep stosb	
-   ;	
-   ;	        mov ax,bx
-   ;	
-	mov	 ax,bx
-   ;	
-   ;	        pop es
-   ;	
-	pop	 es
-   ;	
-   ;	        pop di
-   ;	
-	pop	 di
-   ;	
-   ;	        pop cx
-   ;	
-	pop	 cx
-   ;	
-   ;	        pop bx
-   ;	
-	pop	 bx
-   ;	
-   ;	      }
-   ;	 }
-   ;	
-	pop	di
-	pop	bp
-	ret	
-_malloc	endp
-   ;	
    ;	 void free (addr adr)
    ;	
 	assume	cs:MGRP
@@ -1325,8 +1235,8 @@ _putn	proc	near
    ;	 for (i=1000000000;i!=0;i/=10)
    ;	
 	mov	dword ptr [bp-4],large 03B9ACA00h
-	jmp	short @23@198
-@23@58:
+	jmp	short @22@198
+@22@58:
    ;	
    ;	 {
    ;	 b = dw / i ; dw = dw - (b*i) ;
@@ -1345,28 +1255,28 @@ _putn	proc	near
    ;	 if (b) flag = 1;
    ;	
 	or	bl,bl
-	je	short @23@114
+	je	short @22@114
 	mov	si,1
-@23@114:
+@22@114:
    ;	
    ;	 if (flag)  putc (b+48) ;
    ;	
 	or	si,si
-	je	short @23@170
+	je	short @22@170
 	mov	al,bl
 	add	al,48
 	push	ax
 	call	near ptr MGRP:_putc
 	pop	cx
-@23@170:
+@22@170:
 	mov	ebx,large 10
 	mov	eax,dword ptr [bp-4]
 	xor	edx,edx
 	div	ebx
 	mov	dword ptr [bp-4],eax
-@23@198:
+@22@198:
 	cmp	dword ptr [bp-4],large 0
-	jne	short @23@58
+	jne	short @22@58
    ;	
    ;	 }
    ;	}
@@ -1391,18 +1301,18 @@ _puts	proc	near
    ;	 for (i=0; s[i] != 0; i++) putc (s[i]);
    ;	
 	xor	si,si
-	jmp	short @24@114
-@24@58:
+	jmp	short @23@114
+@23@58:
 	mov	bx,si
 	mov	al,byte ptr [bx+di]
 	push	ax
 	call	near ptr MGRP:_putc
 	pop	cx
 	inc	si
-@24@114:
+@23@114:
 	mov	bx,si
 	cmp	byte ptr [bx+di],0
-	jne	short @24@58
+	jne	short @23@58
    ;	
    ;	}
    ;	
@@ -1411,6 +1321,93 @@ _puts	proc	near
 	pop	bp
 	ret	
 _puts	endp
+   ;	
+   ;	 addr malloc (unsigned int paragraph)
+   ;	
+	assume	cs:MGRP
+_malloc	proc	near
+	push	bp
+	mov	bp,sp
+	push	di
+   ;	
+   ;	 {
+   ;	  asm {
+   ;		push bx
+   ;	
+	push	 bx
+   ;	
+   ;	        push cx
+   ;	
+	push	 cx
+   ;	
+   ;	        push di
+   ;	
+	push	 di
+   ;	
+   ;	        push es
+   ;	
+	push	 es
+   ;	
+   ;	        mov ah,0x0012
+   ;	
+	mov	 ah,00012H
+   ;	
+   ;		mov bx,paragraph
+   ;	
+	mov	 bx,[bp+4]
+   ;	
+   ;		int 0x44
+   ;	
+	int	 044H
+   ;	
+   ;	        mov bx,ax
+   ;	
+	mov	 bx,ax
+   ;	
+   ;	        mov es,ax
+   ;	
+	mov	 es,ax
+   ;	
+   ;	        mov di,0
+   ;	
+	mov	 di,0
+   ;	
+   ;		mov cx,0fff0h
+   ;	
+	mov	 cx,0fff0h
+   ;	
+   ;	        mov ax,0
+   ;	
+	mov	 ax,0
+   ;	
+   ;		// rep stosb
+   ;	        mov ax,bx
+   ;	
+	mov	 ax,bx
+   ;	
+   ;	        pop es
+   ;	
+	pop	 es
+   ;	
+   ;	        pop di
+   ;	
+	pop	 di
+   ;	
+   ;	        pop cx
+   ;	
+	pop	 cx
+   ;	
+   ;	        pop bx
+   ;	
+	pop	 bx
+   ;	
+   ;	      }
+   ;	}
+   ;	
+	pop	di
+	pop	bp
+	ret	
+_malloc	endp
 _ofs	label	word
 	db	0
 	db	0
@@ -6192,6 +6189,12 @@ _start_program	proc	near
 	call	near ptr MGRP:_putc
 	pop	cx
    ;	
+   ;	 puts ("malloc ...\n\r");
+   ;	
+	push	offset MGRP:s@+796
+	call	near ptr MGRP:_puts
+	pop	cx
+   ;	
    ;	 binary = (addr)(malloc (40000>>4));
    ;	
 	push	2500
@@ -6203,6 +6206,16 @@ _start_program	proc	near
    ;	 asm {	shl dword ptr binary,16 }
    ;	
 		shl	 dword ptr MGRP:_binary,16 
+   ;	
+   ;	 puts (get_argz(argv,2));
+   ;	
+	push	2
+	push	offset MGRP:_argv
+	call	near ptr MGRP:_get_argz
+	add	sp,4
+	push	ax
+	call	near ptr MGRP:_puts
+	pop	cx
    ;	
    ;	 input = fopen (get_argz(argv,2));
    ;	
@@ -6222,7 +6235,7 @@ _start_program	proc	near
    ;	
 	cmp	dword ptr MGRP:_input,large 2
 	jae	short @34@170
-	push	offset MGRP:s@+796
+	push	offset MGRP:s@+809
 	call	near ptr MGRP:_puts
 	pop	cx
    ;	
@@ -6230,15 +6243,15 @@ _start_program	proc	near
    ;	
   	shr	 dword ptr MGRP:_binary,16 
    ;	
-   ;	                  free ((addr)binary); return ; }
+   ;			  free ((addr)binary); return ; }
    ;	
 	push	word ptr MGRP:_binary
 	jmp	@34@982
 @34@170:
    ;	
-   ;	 bufferbatch = malloc (0xfff);
+   ;	 bufferbatch = malloc (8000 >> 4);
    ;	
-	push	4095
+	push	500
 	call	near ptr MGRP:_malloc
 	pop	cx
 	mov	word ptr MGRP:_bufferbatch,ax
@@ -6277,7 +6290,7 @@ _start_program	proc	near
    ;	
 	cmp	dword ptr MGRP:_output,large 2
 	jae	short @34@282
-	push	offset MGRP:s@+818
+	push	offset MGRP:s@+831
 	call	near ptr MGRP:_puts
 	pop	cx
    ;	
@@ -6390,7 +6403,7 @@ _start_program	proc	near
 	imul	bx,bx,20
 	cmp	byte ptr MGRP:_wlabel[bx],0
 	je	short @34@702
-	push	offset MGRP:s@+838
+	push	offset MGRP:s@+851
 	call	near ptr MGRP:_error
 	pop	cx
 	mov	ax,word ptr MGRP:_x
@@ -6410,7 +6423,7 @@ _start_program	proc	near
    ;	
 	cmp	word ptr MGRP:_err,0
 	jne	short @34@814
-	push	offset MGRP:s@+858
+	push	offset MGRP:s@+871
 	call	near ptr MGRP:_puts
 	pop	cx
 @34@814:
@@ -6702,6 +6715,10 @@ s@	label	byte
 	db	10
 	db	13
 	db	0
+	db	'malloc ...'
+	db	10
+	db	13
+	db	0
 	db	'input file incorrect.'
 	db	0
 	db	'can'
@@ -6758,11 +6775,11 @@ VPSEG	ends
 	public	_ea
 	public	_ofs
 	public	_binary
+	public	_malloc
 	public	_puts
 	public	_putn
 	public	_putc
 	public	_free
-	public	_malloc
 	public	_fgets
 	public	_file_offset
 	public	_peekchar

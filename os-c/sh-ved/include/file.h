@@ -132,6 +132,12 @@
  {
   unsigned long tm;
   tm = avail ();
+
+   asm {
+       mov      ax,0x0600
+       int      0x46
+      }
+      
   asm {
        push     ds
        push     si
@@ -146,5 +152,5 @@
        pop      si
        pop      ds
       }
- if  ( (check) && (avail() != tm) ) puts ("\n\rwarning: memory no released");
+ if  ( (!is_xsh()) && (check) && (avail() != tm) ) puts ("\n\rwarning: memory no released");
  }

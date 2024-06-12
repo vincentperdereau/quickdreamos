@@ -1,9 +1,0 @@
-
- Start  Stop   Length Name               Class
-
- 00000H 002BDH 002BEH VPSEG              
-
-Error: Undefined symbol DGROUP@ in module SER.C
-Program entry point at 0000:0000
-Warning: No stack
-

@@ -919,7 +919,7 @@ start:          ; eviter le "no program entry point" du Linker
                         DB      ??time
                         DB      ")"
                         DB      LF,CR
-                        DB      "Kernel 0.0.4 (Asylum)"
+                        DB      "Kernel 0.0.5 (Asylum)"
                         DB      LF,CR,LF
                         DB      "DreamOS login: "
                         DB      NULL

@@ -15,23 +15,23 @@ $comm	macro	name,dist,size,count
 	endif
 	?debug	V 300h
 	?debug	S "stdio.c"
-	?debug	C E9D0A0692B07737464696F2E63
-	?debug	C E940190619075F646566732E68
-	?debug	C E94E929B27087374646172672E68
-	?debug	C E945979C27086D656D6F72792E68
+	?debug	C E9DB54C35807737464696F2E63
+	?debug	C E9E34B5357075F646566732E68
+	?debug	C E9E34B5357087374646172672E68
+	?debug	C E9E34B5357086D656D6F72792E68
 _TEXT	segment byte public use16 'CODE'
 _TEXT	ends
-DGROUP	group	_DATA,_BSS
+DGROUP	group	_DATA,VP
 	assume	cs:_TEXT,ds:DGROUP
-_DATA	segment word public use16 'DATA'
+_DATA	segment word public use16 'VP'
 d@	label	byte
 d@w	label	word
 _DATA	ends
-_BSS	segment word public use16 'BSS'
+VP	segment word public use16 'BSS'
 b@	label	byte
 b@w	label	word
-_BSS	ends
-_DATA	segment word public use16 'DATA'
+VP	ends
+_DATA	segment word public use16 'VP'
 _f_stat	label	byte
 	db	0
 _DATA	ends
@@ -145,8 +145,11 @@ _putc	endp
    ;	
 	assume	cs:_TEXT
 _writenum	proc	near
-	enter	6,0
+	push	bp
+	mov	bp,sp
+	sub	sp,4
 	push	si
+	mov	al,byte ptr [bp+8]
    ;	
    ;	{
    ;	 unsigned long i ; unsigned char b ;
@@ -157,26 +160,25 @@ _writenum	proc	near
    ;	
    ;	 if (size==8) i = 100;
    ;	
-	cmp	byte ptr [bp+8],8
+	cmp	al,8
 	jne	short @3@86
 	mov	dword ptr [bp-4],large 100
 @3@86:
    ;	
    ;	 if (size==16) i = 10000;
    ;	
-	cmp	byte ptr [bp+8],16
+	cmp	al,16
 	jne	short @3@142
 	mov	dword ptr [bp-4],large 10000
 @3@142:
    ;	
    ;	 if (size==32) i = 1000000000;
    ;	
-	cmp	byte ptr [bp+8],32
-	jne	short @3@198
+	cmp	al,32
+	jne	short @3@422
 	mov	dword ptr [bp-4],large 03B9ACA00h
+	jmp	short @3@422
 @3@198:
-	jmp	short @3@450
-@3@226:
    ;	
    ;	
    ;	 for (;i!=0;i/=10)
@@ -186,8 +188,7 @@ _writenum	proc	near
 	mov	eax,dword ptr [bp+4]
 	xor	edx,edx
 	div	dword ptr [bp-4]
-	mov	byte ptr [bp-5],al
-	mov	al,byte ptr [bp-5]
+	mov	bl,al
 	mov	ah,0
 	movsx	eax,ax
 	imul	eax,dword ptr [bp-4]
@@ -197,40 +198,40 @@ _writenum	proc	near
    ;	
    ;	 if (b) flag = 1;
    ;	
-	cmp	byte ptr [bp-5],0
-	je	short @3@282
+	or	bl,bl
+	je	short @3@254
 	mov	si,1
-@3@282:
+@3@254:
    ;	
    ;	 if (flag)  putc (b+48) ;
    ;	
 	or	si,si
-	je	short @3@338
-	mov	al,byte ptr [bp-5]
+	je	short @3@310
+	mov	al,bl
 	add	al,48
 	push	ax
 	call	near ptr _putc
-	pop	cx
-@3@338:
+	add	sp,2
+@3@310:
    ;	
    ;	 if ( (!i) && (!flag)) putc (48);
    ;	
 	cmp	dword ptr [bp-4],large 0
-	jne	short @3@422
+	jne	short @3@394
 	or	si,si
-	jne	short @3@422
+	jne	short @3@394
 	push	48
 	call	near ptr _putc
-	pop	cx
-@3@422:
+	add	sp,2
+@3@394:
 	mov	ebx,large 10
 	mov	eax,dword ptr [bp-4]
 	xor	edx,edx
 	div	ebx
 	mov	dword ptr [bp-4],eax
-@3@450:
+@3@422:
 	cmp	dword ptr [bp-4],large 0
-	jne	short @3@226
+	jne	short @3@198
    ;	
    ;	 }
    ;	}
@@ -244,7 +245,9 @@ _writenum	endp
    ;	
 	assume	cs:_TEXT
 _write_hex_byte	proc	near
-	enter	2,0
+	push	bp
+	mov	bp,sp
+	sub	sp,2
    ;	
    ;	 {
    ;	  char letter;
@@ -267,26 +270,25 @@ _write_hex_byte	proc	near
 	mov	al,byte ptr [bp+4]
 	mov	ah,0
 	sar	ax,4
+	mov	dx,ax
 	cmp	ax,9
 	jle	short @4@170
-	mov	al,byte ptr [bp+4]
-	mov	ah,0
-	sar	ax,4
 	add	al,byte ptr [bp-1]
 	add	al,246
+	push	ax
+	call	near ptr _putc
+	add	sp,2
 	jmp	short @4@198
 @4@170:
    ;	
    ;	  else  putc ( (b>>4) + '0' );
    ;	
-	mov	al,byte ptr [bp+4]
-	mov	ah,0
-	sar	ax,4
+	mov	ax,dx
 	add	al,48
-@4@198:
 	push	ax
 	call	near ptr _putc
-	pop	cx
+	add	sp,2
+@4@198:
    ;	
    ;	  if ( (b & 0x0f) > 9 ) putc ( (b & 0x0f) + letter - 10 );
    ;	
@@ -294,23 +296,26 @@ _write_hex_byte	proc	near
 	mov	ah,0
 	and	ax,15
 	cmp	ax,9
-	jle	short @4@282
+	jle	short @4@254
 	mov	al,byte ptr [bp+4]
 	and	al,15
 	add	al,byte ptr [bp-1]
 	add	al,246
-	jmp	short @4@310
-@4@282:
+	push	ax
+	call	near ptr _putc
+	add	sp,2
+	leave	
+	ret	
+@4@254:
    ;	
    ;	  else  putc ( (b & 0x0f) + '0' );
    ;	
 	mov	al,byte ptr [bp+4]
 	and	al,15
 	add	al,48
-@4@310:
 	push	ax
 	call	near ptr _putc
-	pop	cx
+	add	sp,2
    ;	
    ;	 }
    ;	
@@ -360,39 +365,37 @@ _puts	proc	near
 	mov	bp,sp
 	push	si
 	push	di
-	mov	di,word ptr [bp+4]
    ;	
    ;	{
    ;	 int i;
    ;	 for (i=0; s[i] != 0; i++)
    ;	
-	xor	si,si
-	jmp	short @6@170
-@6@58:
+	xor	di,di
+	mov	si,word ptr [bp+4]
+	jmp	short @6@226
+@6@86:
    ;	
    ;	 {
    ;	  if (s[i] == 10) putc (13);
    ;	
-	mov	bx,si
-	cmp	byte ptr [bx+di],10
-	jne	short @6@114
+	cmp	byte ptr [si],10
+	jne	short @6@142
 	push	13
 	call	near ptr _putc
-	pop	cx
-@6@114:
+	add	sp,2
+@6@142:
    ;	
    ;	  putc (s[i]);
    ;	
-	mov	bx,si
-	mov	al,byte ptr [bx+di]
+	mov	al,byte ptr [si]
 	push	ax
 	call	near ptr _putc
-	pop	cx
+	add	sp,2
 	inc	si
-@6@170:
-	mov	bx,si
-	cmp	byte ptr [bx+di],0
-	jne	short @6@58
+	inc	di
+@6@226:
+	cmp	byte ptr [si],0
+	jne	short @6@86
    ;	
    ;	 }
    ;	}
@@ -407,7 +410,9 @@ _puts	endp
    ;	
 	assume	cs:_TEXT
 _printf	proc	near
-	enter	6,0
+	push	bp
+	mov	bp,sp
+	sub	sp,4
 	push	si
 	push	di
    ;	
@@ -434,7 +439,7 @@ _printf	proc	near
 	jne	short @7@114
 	push	13
 	call	near ptr _putc
-	pop	cx
+	add	sp,2
 @7@114:
    ;	
    ;	  if (*format != '%')
@@ -445,11 +450,10 @@ _printf	proc	near
    ;	
    ;	   putc (*format);
    ;	
-	mov	bx,word ptr [bp+4]
 	mov	al,byte ptr [bx]
 	push	ax
 	call	near ptr _putc
-	pop	cx
+	add	sp,2
 	jmp	@7@1346
 @7@170:
    ;	
@@ -461,19 +465,25 @@ _printf	proc	near
 	mov	bx,word ptr [bp+4]
 	mov	al,byte ptr [bx]
 	cbw	
-	mov	word ptr [bp-6],ax
-	mov	cx,5
-	mov	bx,offset @7@C978
-@7@226:
-	mov	ax,word ptr cs:[bx]
-	cmp	ax,word ptr [bp-6]
-	je	short @7@310
-	add	bx,2
-	loop	short @7@226
-	jmp	@7@1290
-@7@310:
-	jmp	word ptr cs:[bx+10]
+	cmp	ax,115
+	je	short @7@422
+	jg	short @7@338
+	cmp	ax,88
+	jne short	@@0
+	jmp	@7@982
+@@0:
+	cmp	ax,99
+	jne short	@@1
+	jmp	@7@1150
+@@1:
+	jmp	@7@1318
 @7@338:
+	cmp	ax,117
+	je	short @7@646
+	cmp	ax,120
+	je	short @7@814
+	jmp	@7@1318
+@7@422:
    ;	
    ;	   {
    ;	    case 's':   asm { mov ax,ss ; mov ds,ax }
@@ -495,23 +505,22 @@ _printf	proc	near
    ;	                if (!adr) puts ("<NULL>");
    ;	
 	or	di,di
-	jne	short @7@534
+	jne	short @7@618
 	push	offset DGROUP:s@
-	jmp	short @7@562
-@7@534:
+	call	near ptr _puts
+	add	sp,2
+	jmp	@7@1346
+@7@618:
    ;	
    ;	                else puts ( (char*)adr );
    ;	
 	push	di
-@7@562:
 	call	near ptr _puts
-	pop	cx
+	add	sp,2
+	jmp	@7@1346
+@7@646:
    ;	
    ;	                break;
-   ;	
-	jmp	@7@1346
-@7@618:
-   ;	
    ;	    case 'u': asm { mov ax,ss ; mov ds,ax }
    ;	
  	mov	 ax,ss 
@@ -539,7 +548,7 @@ _printf	proc	near
    ;	              break;
    ;	
 	jmp	@7@1346
-@7@786:
+@7@814:
    ;	
    ;	    case 'x': asm { mov ax,ss ; mov ds,ax }
    ;	
@@ -567,7 +576,7 @@ _printf	proc	near
    ;	              break;
    ;	
 	jmp	short @7@1346
-@7@954:
+@7@982:
    ;	
    ;	    case 'X': asm { mov ax,ss ; mov ds,ax }
    ;	
@@ -595,7 +604,7 @@ _printf	proc	near
    ;	              break;
    ;	
 	jmp	short @7@1346
-@7@1122:
+@7@1150:
    ;	
    ;	    case 'c': asm { mov ax,ss ; mov ds,ax }
    ;	
@@ -617,18 +626,22 @@ _printf	proc	near
    ;	              putc (ch);
    ;	
 	mov	al,byte ptr [bp-1]
-	jmp	short @7@1318
-@7@1290:
+	push	ax
+	call	near ptr _putc
+	add	sp,2
    ;	
    ;	              break;
+   ;	
+	jmp	short @7@1346
+@7@1318:
+   ;	
    ;	    default:  putc (*format);
    ;	
 	mov	bx,word ptr [bp+4]
 	mov	al,byte ptr [bx]
-@7@1318:
 	push	ax
 	call	near ptr _putc
-	pop	cx
+	add	sp,2
 @7@1346:
    ;	
    ;	
@@ -640,9 +653,9 @@ _printf	proc	near
 @7@1374:
 	mov	bx,word ptr [bp+4]
 	cmp	byte ptr [bx],0
-	je short	@@0
+	je short	@@2
 	jmp	@7@58
-@@0:
+@@2:
    ;	
    ;	  }
    ;	 va_end (vl);
@@ -655,22 +668,6 @@ _printf	proc	near
 	leave	
 	ret	
 _printf	endp
-@7@C978	label	word
-	db	88
-	db	0
-	db	99
-	db	0
-	db	115
-	db	0
-	db	117
-	db	0
-	db	120
-	db	0
-	dw	@7@954
-	dw	@7@1122
-	dw	@7@338
-	dw	@7@618
-	dw	@7@786
    ;	
    ;	 unsigned long f_open (char* fname)
    ;	
@@ -1057,11 +1054,10 @@ _fopen	proc	near
    ;	
 	push	1
 	call	near ptr _malloc
-	pop	cx
+	add	sp,2
 	mov	dx,ds
-	push	dx
-	push	ax
-	pop	eax
+	shl	eax,16
+	shrd	eax,edx,16
 	shld	edx,eax,16
 	mov	word ptr DGROUP:_f+2,dx
 	mov	word ptr DGROUP:_f,ax
@@ -1074,9 +1070,9 @@ _fopen	proc	near
    ;	 if (flag[0] == 'r')
    ;	
 	cmp	byte ptr [si],114
-	je short	@@1
-	jmp	@13@254
-@@1:
+	je short	@@3
+	jmp	@13@198
+@@3:
    ;	
    ;	 {
    ;	  f->bofs = 0;
@@ -1086,35 +1082,22 @@ _fopen	proc	near
    ;	
    ;	  f->op = 2;
    ;	
-	les	bx,dword ptr DGROUP:_f
 	mov	word ptr es:[bx+10],2
    ;	
    ;	  f->handle = f_open (filename);
    ;	
 	push	di
 	call	near ptr _f_open
-	push	dx
-	push	ax
-	pop	eax
-	pop	cx
+	shl	eax,16
+	shrd	eax,edx,16
+	add	sp,2
 	les	bx,dword ptr DGROUP:_f
 	mov	dword ptr es:[bx],eax
    ;	
-   ;	  f->size = f_size (f->handle);
-   ;	
-	les	bx,dword ptr DGROUP:_f
-	push	dword ptr es:[bx]
-	call	near ptr _f_size
-	add	sp,4
-	les	bx,dword ptr DGROUP:_f
-	mov	word ptr es:[bx+8],ax
-   ;	
    ;	  if (f->handle <2)
    ;	
-	les	bx,dword ptr DGROUP:_f
 	cmp	dword ptr es:[bx],large 2
-	jae	short @13@226
-@13@142:
+	jae	short @13@170
    ;	
    ;	  {
    ;	   dc = (unsigned int) ( (unsigned long)(f) >> 16 );
@@ -1125,114 +1108,143 @@ _fopen	proc	near
    ;	
    ;	   free (dc);
    ;	
-	push	word ptr DGROUP:_dc
+	push	ax
 	call	near ptr _free
-	pop	cx
+	add	sp,2
    ;	
    ;	   return (FILE*)0;
    ;	
-@13@170:
 	xor	dx,dx
 	xor	ax,ax
-@13@198:
-	jmp	@13@394
-@13@226:
+	pop	di
+	pop	si
+	pop	bp
+	ret	
+@13@170:
    ;	
    ;	  }
-   ;	  f->bseg = malloc (  ((f->size) >> 4) +1);
+   ;	  f->size = f_size (f->handle);
    ;	
 	les	bx,dword ptr DGROUP:_f
+	push	dword ptr es:[bx]
+	call	near ptr _f_size
+	add	sp,4
+	les	bx,dword ptr DGROUP:_f
+	mov	word ptr es:[bx+8],ax
+   ;	
+   ;	  f->bseg = malloc (  ((f->size) >> 4) +1);
+   ;	
 	mov	ax,word ptr es:[bx+8]
 	shr	ax,4
 	inc	ax
 	push	ax
 	call	near ptr _malloc
-	pop	cx
+	add	sp,2
 	les	bx,dword ptr DGROUP:_f
 	mov	word ptr es:[bx+4],ax
    ;	
    ;	  f_read (f->handle,f->size,(void*)f->bofs,f->bseg);
    ;	
-	les	bx,dword ptr DGROUP:_f
 	push	word ptr es:[bx+4]
-	les	bx,dword ptr DGROUP:_f
 	push	word ptr es:[bx+6]
-	les	bx,dword ptr DGROUP:_f
 	movzx	eax,word ptr es:[bx+8]
 	push	eax
-	les	bx,dword ptr DGROUP:_f
 	push	dword ptr es:[bx]
 	call	near ptr _f_read
 	add	sp,12
-	jmp	short @13@338
-@13@254:
    ;	
    ;	  return (f);
+   ;	
+	mov	dx,word ptr DGROUP:_f+2
+	mov	ax,word ptr DGROUP:_f
+	pop	di
+	pop	si
+	pop	bp
+	ret	
+@13@198:
+   ;	
    ;	 }
    ;	 if (flag[0] == 'w')
    ;	
 	cmp	byte ptr [si],119
-	jne	short @13@366
+	jne	short @13@310
    ;	
    ;	 {
    ;	  f->bseg = malloc (0xfff);
    ;	
 	push	4095
 	call	near ptr _malloc
-	pop	cx
+	add	sp,2
 	les	bx,dword ptr DGROUP:_f
 	mov	word ptr es:[bx+4],ax
    ;	
    ;	  f->bofs = 0;
    ;	
-	les	bx,dword ptr DGROUP:_f
 	mov	word ptr es:[bx+6],0
    ;	
    ;	  f->op = 3;
    ;	
-	les	bx,dword ptr DGROUP:_f
 	mov	word ptr es:[bx+10],3
    ;	
    ;	  f->size = 0;
    ;	
-	les	bx,dword ptr DGROUP:_f
 	mov	word ptr es:[bx+8],0
    ;	
    ;	  f->handle = f_create (filename);
    ;	
 	push	di
 	call	near ptr _f_create
-	push	dx
-	push	ax
-	pop	eax
-	pop	cx
+	shl	eax,16
+	shrd	eax,edx,16
+	add	sp,2
 	les	bx,dword ptr DGROUP:_f
 	mov	dword ptr es:[bx],eax
    ;	
    ;	  if (f->handle <2)
    ;	
-	les	bx,dword ptr DGROUP:_f
 	cmp	dword ptr es:[bx],large 2
-	jae	short @13@338
-	jmp	@13@142
-@13@338:
+	jae	short @13@282
    ;	
    ;	  {
    ;	   dc = (unsigned int) ( (unsigned long)(f) >> 16 );
+   ;	
+	mov	eax,dword ptr DGROUP:_f
+	shr	eax,16
+	mov	word ptr DGROUP:_dc,ax
+   ;	
    ;	   free (dc);
+   ;	
+	push	ax
+	call	near ptr _free
+	add	sp,2
+   ;	
    ;	   return (FILE*)0;
+   ;	
+	xor	dx,dx
+	xor	ax,ax
+	pop	di
+	pop	si
+	pop	bp
+	ret	
+@13@282:
+   ;	
    ;	  }
    ;	  return (f);
    ;	
 	mov	dx,word ptr DGROUP:_f+2
 	mov	ax,word ptr DGROUP:_f
-	jmp	@13@198
-@13@366:
-	jmp	@13@170
-@13@394:
+	pop	di
+	pop	si
+	pop	bp
+	ret	
+@13@310:
    ;	
    ;	 }
    ;	 return (FILE*)0;
+   ;	
+	xor	dx,dx
+	xor	ax,ax
+   ;	
    ;	}
    ;	
 	pop	di
@@ -1260,7 +1272,6 @@ _fread	proc	near
 	push	ax
 	les	bx,dword ptr [bp+10]
 	push	word ptr es:[bx+6]
-	les	bx,dword ptr [bp+10]
 	push	word ptr es:[bx+4]
 	push	word ptr [bp+4]
 	push	cs
@@ -1303,7 +1314,6 @@ _fwrite	proc	near
 	push	cs
 	les	bx,dword ptr [bp+10]
 	push	word ptr es:[bx+6]
-	les	bx,dword ptr [bp+10]
 	push	word ptr es:[bx+4]
 	call	near ptr _memcpy
 	add	sp,10
@@ -1317,9 +1327,7 @@ _fwrite	proc	near
    ;	
    ;	 fd->size = fd->bofs;
    ;	
-	les	bx,dword ptr [bp+10]
 	mov	ax,word ptr es:[bx+6]
-	les	bx,dword ptr [bp+10]
 	mov	word ptr es:[bx+8],ax
    ;	
    ;	}
@@ -1355,7 +1363,6 @@ _fseek	proc	near
 	les	bx,dword ptr [bp+4]
 	mov	ax,word ptr es:[bx+6]
 	add	ax,word ptr [bp+8]
-	les	bx,dword ptr [bp+4]
 	mov	word ptr es:[bx+6],ax
 @16@142:
    ;	
@@ -1366,7 +1373,6 @@ _fseek	proc	near
 	les	bx,dword ptr [bp+4]
 	mov	ax,word ptr es:[bx+8]
 	sub	ax,word ptr [bp+8]
-	les	bx,dword ptr [bp+4]
 	mov	word ptr es:[bx+6],ax
 @16@198:
    ;	
@@ -1388,21 +1394,19 @@ _fgetc	proc	near
    ;	
 	les	bx,dword ptr [bp+4]
 	mov	ax,word ptr es:[bx+6]
-	les	bx,dword ptr [bp+4]
 	cmp	ax,word ptr es:[bx+8]
-	jne	short @17@114
+	jne	short @17@86
 	mov	byte ptr DGROUP:_f_stat,1
 	mov	al,0
+	pop	bp
+	ret	
 @17@86:
-	jmp	short @17@142
-@17@114:
    ;	
    ;	 memcpy (_CS,(unsigned int)&(static_c),fd->bseg,fd->bofs,1);
    ;	
 	push	1
 	les	bx,dword ptr [bp+4]
 	push	word ptr es:[bx+6]
-	les	bx,dword ptr [bp+4]
 	push	word ptr es:[bx+4]
 	push	offset DGROUP:static_c
 	push	cs
@@ -1417,8 +1421,6 @@ _fgetc	proc	near
    ;	 return static_c;
    ;	
 	mov	al,byte ptr DGROUP:static_c
-	jmp	short @17@86
-@17@142:
    ;	
    ;	}
    ;	
@@ -1430,7 +1432,9 @@ _fgetc	endp
    ;	
 	assume	cs:_TEXT
 _fgets	proc	near
-	enter	4,0
+	push	bp
+	mov	bp,sp
+	sub	sp,2
 	push	si
 	push	di
 	mov	di,word ptr [bp+4]
@@ -1449,7 +1453,7 @@ _fgets	proc	near
    ;	   f_stat = 0;
    ;	
 	mov	byte ptr DGROUP:_f_stat,0
-	jmp	short @18@170
+	jmp	short @18@114
 @18@58:
    ;	
    ;	   while((c++ < (len-1)) && (!f_stat) ) {
@@ -1459,49 +1463,40 @@ _fgets	proc	near
    ;	
    ;	      ch = fgetc (f);
    ;	
-	push	word ptr [bp+10]
-	push	word ptr [bp+8]
+	push	dword ptr [bp+8]
 	call	near ptr _fgetc
 	add	sp,4
-	mov	byte ptr [bp-3],al
+	mov	dl,al
    ;	
    ;	      if(ch == '\r')
    ;	
-	cmp	byte ptr [bp-3],13
-	jne	short @18@114
+	cmp	dl,13
+	je	short @18@114
    ;	
    ;	         continue;
-   ;	
-	jmp	short @18@170
-@18@114:
-   ;	
    ;	      *p++ = ch;
    ;	
-	mov	al,byte ptr [bp-3]
-	mov	byte ptr [si],al
+	mov	byte ptr [si],dl
 	inc	si
    ;	
    ;	      if(ch == '\n')
    ;	
-	cmp	byte ptr [bp-3],10
-	jne	short @18@170
-   ;	
-   ;	         break;
-   ;	
-	jmp	short @18@226
-@18@170:
+	cmp	dl,10
+	je	short @18@170
+@18@114:
 	mov	ax,word ptr [bp-2]
 	inc	word ptr [bp-2]
 	mov	dx,word ptr [bp+6]
 	dec	dx
 	cmp	ax,dx
-	jge	short @18@226
+	jge	short @18@170
 	mov	al,byte ptr DGROUP:_f_stat
 	cbw	
 	or	ax,ax
 	je	short @18@58
-@18@226:
+@18@170:
    ;	
+   ;	         break;
    ;	   }
    ;	
    ;	   if(!f_stat)
@@ -1509,25 +1504,24 @@ _fgets	proc	near
 	mov	al,byte ptr DGROUP:_f_stat
 	cbw	
 	or	ax,ax
-	jne	short @18@310
+	jne	short @18@226
    ;	
    ;	      return(0);
    ;	
 	xor	ax,ax
-@18@282:
-	jmp	short @18@338
-@18@310:
+	pop	di
+	pop	si
+	leave	
+	ret	
+@18@226:
    ;	
    ;	   *p++ = 0;
    ;	
 	mov	byte ptr [si],0
-	inc	si
    ;	
    ;	   return (buf);
    ;	
 	mov	ax,di
-	jmp	short @18@282
-@18@338:
    ;	
    ;	}
    ;	
@@ -1550,13 +1544,10 @@ _fclose	proc	near
 	les	bx,dword ptr [bp+4]
 	cmp	word ptr es:[bx+10],3
 	jne	short @19@86
-	les	bx,dword ptr [bp+4]
 	push	word ptr es:[bx+4]
 	push	0
-	les	bx,dword ptr [bp+4]
 	movzx	eax,word ptr es:[bx+8]
 	push	eax
-	les	bx,dword ptr [bp+4]
 	push	dword ptr es:[bx]
 	call	near ptr _f_write
 	add	sp,12
@@ -1567,7 +1558,7 @@ _fclose	proc	near
 	les	bx,dword ptr [bp+4]
 	push	word ptr es:[bx+4]
 	call	near ptr _free
-	pop	cx
+	add	sp,2
    ;	
    ;	 dc = (unsigned int) ( (unsigned long)(fd) >> 16 );
    ;	
@@ -1577,9 +1568,9 @@ _fclose	proc	near
    ;	
    ;	 free (dc);
    ;	
-	push	word ptr DGROUP:_dc
+	push	ax
 	call	near ptr _free
-	pop	cx
+	add	sp,2
    ;	
    ;	}
    ;	
@@ -1601,8 +1592,6 @@ _fsize	proc	near
 	push	dword ptr es:[bx]
 	call	near ptr _f_size
 	add	sp,4
-	jmp	short @20@58
-@20@58:
    ;	
    ;	}
    ;	
@@ -1610,7 +1599,7 @@ _fsize	proc	near
 	ret	
 _fsize	endp
 _TEXT	ends
-_BSS	segment word public use16 'BSS'
+VP	segment word public use16 'BSS'
 static_c	label	byte
 	db	1 dup (?)
 _dc	label	word
@@ -1618,9 +1607,9 @@ _dc	label	word
 _f	label	dword
 	db	4 dup (?)
 	?debug	C E9
-	?debug	C FA00000000
-_BSS	ends
-_DATA	segment word public use16 'DATA'
+	?debug	C FA15010000
+VP	ends
+_DATA	segment word public use16 'VP'
 s@	label	byte
 	db	'<NULL>'
 	db	0

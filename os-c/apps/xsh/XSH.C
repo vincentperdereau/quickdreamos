@@ -538,14 +538,17 @@ void MoveWindow (void)
 {
  unsigned int mret;
  unsigned int Wx,Wy;
+ unsigned int deltax,deltay;
  unsigned int oldWx,oldWy;
 
  Wx = topWnd->x; oldWx = Wx;
  Wy = topWnd->y; oldWy = Wy;
  MouseX = mx; MouseY = my;
+ deltax = MouseX - Wx;
+ deltay = MouseY - Wy;
  hidemouse ();
- MouseB = 3;
- while ( MouseB == 3 )
+ MouseB = 1;
+ while ( MouseB == 1 )
  {
   if ( (oldWx != Wx) || (oldWy != Wy) )
   {
@@ -558,6 +561,10 @@ void MoveWindow (void)
        push bx
        push cx
        push dx
+       mov cx,0
+       mov dx,0x3d09
+       mov ah,0x86
+       int 0x15
        mov ax,3
        int 0x33
        mov cs:MouseX,cx
@@ -568,7 +575,7 @@ void MoveWindow (void)
        pop bx
        pop ax
       }
-  Wx = MouseX; Wy = MouseY;
+  Wx = MouseX - deltax; Wy = MouseY - deltay;
  }
    XORRectangle (topWnd->x,topWnd->y,topWnd->x+topWnd->w,topWnd->y+topWnd->h);
    XORRectangle (oldWx,oldWy,oldWx+topWnd->w,oldWy+topWnd->h);
@@ -621,6 +628,7 @@ static int show_mouse;
 
 void mouse_handler ()
 {
+ asm cli
  asm { push ax bx cx dx ds };
  asm { mov ax,cs
        mov ds,ax }
@@ -646,6 +654,7 @@ void mouse_handler ()
   oldy = my;
  }
  asm { pop ds dx cx bx ax };
+ asm sti
  asm { retf };
 }
 
@@ -734,6 +743,10 @@ char scankey (void)
 unsigned int bmouse (void)
 {
  asm {
+    mov cx,0
+    mov dx,0x3d09
+    mov ah,0x86
+    int 0x15
 	mov ax,3
 	int 0x33
 	mov ax,bx
@@ -837,25 +850,25 @@ unsigned char pixel;
 
 void ShowMem (void)
 {
- CreateWindow (120,120,290,85,3,"Memory Usage");
+ CreateWindow (120,120,290,105,3,"Memory Usage");
 /*
  SetColor (7);
  Bar (145,150,405,165);
  Bar (145,180,405,195);
 */
  SetColor (0);
- OutTextXY (145,137+2-2,"Real Memory");
- OutTextXY (145,166+2-2,"High Memory");
- Rectangle (145,150,405,165);
- Rectangle (145,180,405,195);
+ OutTextXY (145,147+2-2,"Real Memory");
+ OutTextXY (145,181+2-2,"High Memory");
+ Rectangle (145,160,405,175);
+ Rectangle (145,195,405,210);
  SetColor (15);
- Line (145,165,405,165);
- Line (405,150,405,165);
- Line (145,195,405,195);
- Line (405,180,405,195);
+ Line (145,175,405,175);
+ Line (405,160,405,175);
+ Line (145,210,405,210);
+ Line (405,195,405,210);
  SetColor (9);
- Bar (146,151,146+ ( (260 * avail()) / 0x7000 ),164);
- Bar (146,181,146+ ( (260 * GetHiMemoryAvail ()) / HiMemoryAvailable () ),194);
+ Bar (146,161,146+ ( (260 * avail()) / 0x7000 ),174);
+ Bar (146,196,146+ ( (260 * GetHiMemoryAvail ()) / HiMemoryAvailable () ),209);
  SetColor (0);
 }
 	       
@@ -1732,16 +1745,20 @@ void ExecuteControl ()
  switch (dumControl->ControlType)
  {
   case CONTROL_TYPE_BUTTON:
+
    memcpy (_CS,(unsigned int)TempString,dumControl->StrSegment,dumControl->StrOffset,49);
    hidemouse ();
    pButton (dumControl->x,dumControl->y,dumControl->x+dumControl->w,
 	    dumControl->y+dumControl->h,TempString);
-   do
+	    
+   /*do
    {
     if (is_key()) getch();
     k = scankey ();
-   } while ( HoldKey == k );
+   } while ( HoldKey == k );*/
+   
    if (mouse_status) while ( bmouse () == 1 );
+   
    Button (dumControl->x,dumControl->y,dumControl->x+dumControl->w,
 	   dumControl->y+dumControl->h,TempString);
    SysBuf.byte2 = dumControl->ControlID;
@@ -1898,7 +1915,7 @@ CONTROL CreateControl (unsigned int x, unsigned int y, unsigned int w,
   break;
  case CONTROL_TYPE_TXTAREA:
   SetColor (COLOR_B);
-  fastbar (x+hWnd->x+5,y+hWnd->y+20,x+hWnd->x+w+5,y+hWnd->y+h+20+1);
+  Bar (x+hWnd->x+5,y+hWnd->y+20,x+hWnd->x+w+5,y+hWnd->y+h+20+1);
 //  SetColor (15);
 //  Rectangle (x+hWnd->x+5+1,y+1+hWnd->y+20,x+hWnd->x+w+5-1,y+hWnd->y+h+20-1);
   FarTABuffer = (CapSegment * 65536) + CapOffset;
@@ -1970,7 +1987,7 @@ void WindowManager (void)
    TickMenu ();
   }
   else
-  if ( (bmouse () == 3) && mouse_status)
+  /*if ( (bmouse () == 3) && mouse_status)
   {
    if (  (mx > (topWnd->x+15))&&(my > topWnd->y)
        &&(mx < (topWnd->x+topWnd->w))&&(my < (topWnd->y+15)) )
@@ -1978,11 +1995,11 @@ void WindowManager (void)
     MoveWindow ();
    }
   }
-  else
+  else*/
   if ( (bmouse () == 1) && mouse_status)
   {
    if (topWnd == (HWND)0) continue;
-
+   
    is_control = 0;
 
    if (  (mx > topWnd->x)&&(my > topWnd->y)
@@ -1993,6 +2010,11 @@ void WindowManager (void)
     {
      DestroyWindow (topWnd);
     }
+   else if (  (mx > (topWnd->x+15))&&(my > topWnd->y)
+       &&(mx < (topWnd->x+topWnd->w))&&(my < (topWnd->y+15)) )
+   {
+    MoveWindow ();
+   }
 
     else
     {
@@ -2035,21 +2057,13 @@ void WindowManager (void)
   activeEditBox = dumControl;
  }
 
-
-
-
-
        SetColor (0);
        Rectangle (dumControl->x,dumControl->y,dumControl->w+dumControl->x,
 		  dumControl->y+dumControl->h);
        showmouse ();
        topWnd->ActiveControl = dumControl;
 
-       // OutTextXY (10,10,"ExecuteControl ()");
-
        ExecuteControl ();
-
-
 
        while ( bmouse () == 1 ) ;
 
@@ -2148,6 +2162,8 @@ static unsigned int DataSegment;
 
 void interrupt Int48 (void)
 {
+     asm cli
+     asm pusha
  _AX = _DS;
  _BX = _CS;
  _DS = _BX;
@@ -2248,6 +2264,9 @@ void interrupt Int48 (void)
 
  _AX = DataSegment;
  _DS = _AX;
+
+ asm popa
+ asm sti
 }
 
 char GetProc (void)
@@ -2275,7 +2294,7 @@ void About (void)
  hidemouse ();          
  i = (gmode == 1) ? 0 : 80;
  CreateWindow (160+i,50,320,220+14,3,"About");
- 
+
  pic ("/qwin/logo.pic",50+10);
  BGWindow = 7;
 // ShowIcon (93,145,"/qwin/eye.ico");
@@ -2291,7 +2310,7 @@ void About (void)
  SetColor (7);
  setFont (0);
  OutTextXY (170+5*8+i,abouty," 86");
- OutTextXY (170+100+7*8+8+i,abouty,"R0.4c");
+ OutTextXY (170+100+7*8+8+i,abouty,"R0.5");
  PrintChar (GetProc (),170+5*8+i,abouty,7,255,0);
  PrintChar ( ((HiMemoryAvailable () / 1024) / 10)+48,390+8*7+8+i,abouty,7,255,0);
  PrintChar ( ((HiMemoryAvailable () / 1024) % 10)+48+1,390+8*7+8+8+i,abouty,7,255,0);
@@ -2448,7 +2467,7 @@ char fileS [24];
 char resultS [24];
 
 void TickMenu (void)
-{
+{ 
  if (is_full_app) return;
 
  strcpy (fileS,"/etc/qwin.rc");
@@ -2515,6 +2534,7 @@ void StartProgram ()
 
  
  gmode = get_mode ();
+ gmode = 2;
   if (gmode == 1)
    init640480 ();
   else 
@@ -2557,8 +2577,9 @@ void StartProgram ()
  activeButton = (CONTROL)0;
  activeEditBox = (CONTROL)0;
 
+ 
  HiMemoryInit ();
-
+ 
  palfile = fopen ("/qwin/qwin.ini");
  if (palfile < 2) return;
  bufferbatch = malloc ( (fsize (palfile) / 16) + 1);
@@ -2567,19 +2588,16 @@ void StartProgram ()
  file_offset = 0;
 
  cmdsh [0] = '\0' ;
+
  while (cmdsh [0] != '>' )
  {
   fgets (cmdsh);
   exec (cmdsh,0,0);
  }
-
+ 
  free (bufferbatch);
-
-/*
- exec ("/qwin/int",0,0);
-
- exec ("/qwin/logon",0,0);
-*/
+ 
+ //exec ("/qwin/dock",0,0);
 
  mx = 0;
  my = 0;

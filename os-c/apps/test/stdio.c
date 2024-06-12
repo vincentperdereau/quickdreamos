@@ -256,13 +256,13 @@ FILE* fopen (char* filename, char* flag)
   f->bofs = 0;
   f->op = 2;
   f->handle = f_open (filename);
-  f->size = f_size (f->handle);
   if (f->handle <2)
   {
    dc = (unsigned int) ( (unsigned long)(f) >> 16 );
    free (dc);
    return (FILE*)0;
   }
+  f->size = f_size (f->handle);
   f->bseg = malloc (  ((f->size) >> 4) +1);
   f_read (f->handle,f->size,(void*)f->bofs,f->bseg);
   return (f);

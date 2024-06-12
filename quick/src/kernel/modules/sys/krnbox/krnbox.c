@@ -53,7 +53,7 @@
      {
       // renvoie la version du noyau
       case API_TEST:    krnbox.UINT1 = 1234;
-                        krnbox.UINT2 = 0x0004; /* version */
+			krnbox.UINT2 = 0x0005; /* version */
                         break;
       // ouverture du fichier
       case API_FOPEN:   memcpy (KERNEL_SEG,BUFFER_OFS,krnbox.UINT1,krnbox.UINT2,255);

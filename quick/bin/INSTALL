@@ -67,6 +67,7 @@ cp a:/bin/kmsg c:/bin/kmsg
 cp a:/bin/as c:/bin/as
 cp a:/bin/ng c:/bin/ng
 cp a:/dev/cua0 c:/dev/cua0
+cp a:/dev/ps2mouse c:/dev/ps2mouse
 cp a:/qwin/keyb c:/qwin/keyb
 cp a:/qwin/wpal c:/qwin/wpal
 cp a:/qwin/np c:/qwin/np

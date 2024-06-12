@@ -5,6 +5,10 @@ void main ()
 {
  Init ();
  StartProgram ();
+ asm {
+       mov      ax,0x0601
+       int      0x46
+ }
  asm { retf };
 }
 
@@ -23,8 +27,8 @@ void main ()
 
 static unsigned int DataSegment;
 
-#define FuncEntry _AX = _DS; _BX = _CS; _DS = _BX; DataSegment = _AX;
-#define FuncEnd _AX = DataSegment; _DS = _AX; asm { retf };
+#define FuncEntry asm { cli }; asm { pusha }; _AX = _DS; _BX = _CS; _DS = _BX; DataSegment = _AX;
+#define FuncEnd _AX = DataSegment; _DS = _AX; asm { popa }; asm { sti }; asm { retf };
 
 struct SystemBuffer {
 unsigned char function;

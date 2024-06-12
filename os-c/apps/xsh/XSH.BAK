@@ -829,8 +829,8 @@ unsigned char pixel;
     {
      if (picx==480) { picy--;picx=160;}
     }
-    else if (picx == 560) { picy--;picx=240;
-   }               
+    else if (picx == 560) { picy--;picx=240; }
+   }
   }
  free (mpic);
 }
@@ -2269,10 +2269,13 @@ char GetProc (void)
 
 void About (void)
 {
+ int i;
 
  BGWindow = 0;
- hidemouse ();
- CreateWindow (160,50,320,220+14,3,"About");
+ hidemouse ();          
+ i = (gmode == 1) ? 0 : 80;
+ CreateWindow (160+i,50,320,220+14,3,"About");
+ 
  pic ("/qwin/logo.pic",50+10);
  BGWindow = 7;
 // ShowIcon (93,145,"/qwin/eye.ico");
@@ -2282,16 +2285,16 @@ void About (void)
 // Line (130,160,234,160);
  setFont (2);
  SetColor (15);
- OutTextXY (170+8,abouty,"CPU:");
- OutTextXY (170+100,abouty,"Kernel:");
- OutTextXY (170+100+120+8,abouty,"Memory:");
+ OutTextXY (170+8+i,abouty,"CPU:");
+ OutTextXY (170+100+i,abouty,"Kernel:");
+ OutTextXY (170+100+120+8+i,abouty,"Memory:");
  SetColor (7);
  setFont (0);
- OutTextXY (170+5*8,abouty," 86");
- OutTextXY (170+100+7*8+8,abouty,"R0.4b");
- PrintChar (GetProc (),170+5*8,abouty,7,255,0);
- PrintChar ( ((HiMemoryAvailable () / 1024) / 10)+48,390+8*7+8,abouty,7,255,0);
- PrintChar ( ((HiMemoryAvailable () / 1024) % 10)+48+1,390+8*7+8+8,abouty,7,255,0);
+ OutTextXY (170+5*8+i,abouty," 86");
+ OutTextXY (170+100+7*8+8+i,abouty,"R0.4c");
+ PrintChar (GetProc (),170+5*8+i,abouty,7,255,0);
+ PrintChar ( ((HiMemoryAvailable () / 1024) / 10)+48,390+8*7+8+i,abouty,7,255,0);
+ PrintChar ( ((HiMemoryAvailable () / 1024) % 10)+48+1,390+8*7+8+8+i,abouty,7,255,0);
  setFont (2);
  showmouse ();
  BGWindow = 7;
@@ -2554,8 +2557,9 @@ void StartProgram ()
  activeButton = (CONTROL)0;
  activeEditBox = (CONTROL)0;
 
+ 
  HiMemoryInit ();
-
+ 
  palfile = fopen ("/qwin/qwin.ini");
  if (palfile < 2) return;
  bufferbatch = malloc ( (fsize (palfile) / 16) + 1);
@@ -2564,13 +2568,16 @@ void StartProgram ()
  file_offset = 0;
 
  cmdsh [0] = '\0' ;
+ /*
  while (cmdsh [0] != '>' )
  {
   fgets (cmdsh);
   exec (cmdsh,0,0);
  }
-
+ */
  free (bufferbatch);
+ 
+ exec ("/qwin/dock",0,0);
 
 /*
  exec ("/qwin/int",0,0);

@@ -15,7 +15,7 @@ $comm	macro	name,dist,size,count
 	endif
 	?debug	V 300h
 	?debug	S "debugfs.c"
-	?debug	C E9A0985A2A09646562756766732E63
+	?debug	C E9E34B535709646562756766732E63
 VPSEG	segment byte public use16 
 VPSEG	ends
 MGRP	group	VPSEG
@@ -44,8 +44,8 @@ _ProgramStartup	proc	near
    ;	
 	ret	
 _ProgramStartup	endp
-	?debug	C E951A3112709747970656465662E68
-	?debug	C E96FA05627066469736B2E68
+	?debug	C E9E34B535709747970656465662E68
+	?debug	C E9E34B5357066469736B2E68
    ;	
    ;	  bool reset_disk (uchar d)
    ;	
@@ -615,7 +615,7 @@ _absolute_disk_access	proc	near
 	leave	
 	ret	
 _absolute_disk_access	endp
-	?debug	C E97DA06C27046C732E68
+	?debug	C E9E34B5357046C732E68
 _lastf	label	word
 	db	0
 	db	0
@@ -725,7 +725,7 @@ _fcb_dir	proc	near
 	pop	bp
 	ret	
 _fcb_dir	endp
-	?debug	C E98E635A2A08737472696E672E68
+	?debug	C E9E34B535708737472696E672E68
    ;	
    ;	  void strcpy (string c, string s)
    ;	

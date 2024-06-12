@@ -86,7 +86,7 @@ void console (void)
  BGWindow = 0;
  Window (8,10,65*8,15*16-1,3,"terminal");
  SetColor (0);
-// fastbar (16,27,65*8,15*16+5);
+ //fastbar (16,27,65*8,15*16+5);
  set_int_29 ();
  shell = get_shell();
  setFont (0);

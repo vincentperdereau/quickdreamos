@@ -15,7 +15,7 @@ $comm	macro	name,dist,size,count
 	endif
 	?debug	V 300h
 	?debug	S "cs4235.c"
-	?debug	C E9F99B0129086373343233352E63
+	?debug	C E9E34B5357086373343233352E63
 _TEXT	segment byte public use16 'CODE'
 _TEXT	ends
 DGROUP	group	_DATA,_BSS

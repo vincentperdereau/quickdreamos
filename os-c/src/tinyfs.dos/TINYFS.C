@@ -14,11 +14,11 @@
  #define write_hex_dword(x)	printf ("%X",x);
 
  char	cmd [100];
- char   cmd1 [100];
- char   cmd2 [100];
- char   cmd3 [100];
+ char   cmd1 [20];
+ char   cmd2 [40];
+ char   cmd3 [40];
  char   prompt [100];
- unsigned char fbuffer [40000];
+ unsigned char* fbuffer;
 
  /*****************/
 
@@ -101,6 +101,9 @@
   printf ("\ntinyfs.exe");
   printf ("\ntype 'exit' to quit\n");
   init_disk (0);
+  fbuffer =  (unsigned char*)malloc(53000);
+
+  printf("\nbuffer=%d", fbuffer); 
 
   strcpy (prompt,"a:/"); 
   do {
@@ -108,6 +111,7 @@
 	if (argc > 1) strcpy (cmd,argv[1]);
 	else gets (cmd);
 	sscanf (cmd,"%s %s %s",cmd1,cmd2,cmd3);
+	printf("cmd1=%s, cmd2=%s, cmd3=%s", cmd1,cmd2,cmd3);
 
 	if (!strcmp (cmd1,"ls")) dir (cmd2);
 	else if (!strcmp (cmd1,"format")) format (0);
@@ -124,10 +128,14 @@
 				       fclose (stream);
 				       }
 	else if (!strcmp (cmd1,"put")) {
+                    printf("\n** put:\n");
 					stream = fopen (cmd2,"rb");
+					printf ("\stream: %d\n",stream);
 					if (stream==NULL) break;
-					fread (fbuffer,filelength ( fileno(stream)),1,stream);
+					printf("fsize=%u", filelength ( fileno(stream)));
+                    fread (fbuffer,filelength ( fileno(stream)),1,stream);
 					printf ("\n%s -> %s [%u]\n",cmd2,cmd3,filelength ( fileno(stream)));
+//break;
 					handle = f_create (cmd3);
 					printf ("\nhandle: %d\n",handle);
 					printf ("\n%d\n",f_write (handle,filelength ( fileno(stream)),FP_SEG(fbuffer),FP_OFF(fbuffer)));
@@ -168,5 +176,7 @@
 	else printf ("unknown command\n");
 
      } while ( (strcmp(cmd1,"exit")) && (argc < 2));
+
+free(fbuffer);
 
  }
