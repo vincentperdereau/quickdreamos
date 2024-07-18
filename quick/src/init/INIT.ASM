@@ -497,6 +497,13 @@ start:          ; eviter le "no program entry point" du Linker
                 FUNCTION$READLN:
                         pusha
                         mov     dx,cx
+                        
+                        mov     al,es:[bx]
+                        cmp     al,0
+                        je      FUNCTION$READ_readln 
+                        inc     bx
+                        dec     cx
+                        
                 FUNCTION$READ_readln:
 
                         mov     ah,18h          ; lecture touche

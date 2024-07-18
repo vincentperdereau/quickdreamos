@@ -15,7 +15,7 @@ $comm	macro	name,dist,size,count
 	endif
 	?debug	V 300h
 	?debug	S "ved.c"
-	?debug	C E91256BB58057665642E63
+	?debug	C E95296E458057665642E63
 VPSEG	segment byte public use16 
 VPSEG	ends
 MGRP	group	VPSEG
@@ -48,6 +48,27 @@ _ProgramEntry	proc	near
    ;	
 	ret	
 _ProgramEntry	endp
+   ;	
+   ;	char is_xsh (void)
+   ;	
+	assume	cs:MGRP
+_is_xsh	proc	near
+   ;	
+   ;	{
+   ;	 asm {
+   ;	        mov ah,4
+   ;	
+	mov	 ah,4
+   ;	
+   ;	        int 0x46
+   ;	
+	int	 046H
+   ;	
+   ;	     }
+   ;	}
+   ;	
+	ret	
+_is_xsh	endp
 _isecho	label	word
 	db	1
 	db	0
@@ -97,7 +118,7 @@ _puts	proc	near
    ;	 if (isecho)
    ;	
 	cmp	word ptr MGRP:_isecho,0
-	je	short @3@366
+	je	short @4@366
    ;	
    ;	 asm {
    ;	        push    ax
@@ -143,7 +164,7 @@ _puts	proc	near
    ;	        pop     ax
    ;	
 	pop	     ax
-@3@366:
+@4@366:
    ;	
    ;	     }
    ;	}
@@ -250,7 +271,7 @@ _avail	proc	near
    ;	
 	ret	
 _avail	endp
-	?debug	C E9E34B5357102E5C494E434C5544455C66696C652E68
+	?debug	C E9F278E458102E5C494E434C5544455C66696C652E68
    ;	
    ;	 handle fopen (char* fname)
    ;	
@@ -717,6 +738,18 @@ _exec	proc	near
 	pop	eax
 	mov	dword ptr [bp-4],eax
    ;	
+   ;	
+   ;	   asm {
+   ;	       mov      ax,0x0600
+   ;	
+	mov	      ax,00600H
+   ;	
+   ;	       int      0x46
+   ;	
+	int	      046H
+   ;	
+   ;	      }
+   ;	      
    ;	  asm {
    ;	       push     ds
    ;	
@@ -767,21 +800,27 @@ _exec	proc	near
 	pop	      ds
    ;	
    ;	      }
-   ;	 if  ( (check) && (avail() != tm) ) puts ("\n\rwarning: memory no released");
+   ;	      
+   ;	 if  ( (!is_xsh()) && (check) && (avail() != tm) ) puts ("\n\rwarning: memory no released");
    ;	
+	call	near ptr MGRP:_is_xsh
+	cbw	
+	or	ax,ax
+	jne	short @16@562
 	cmp	byte ptr [bp+10],0
-	je	short @15@478
+	je	short @16@562
 	call	near ptr MGRP:_avail
 	push	dx
 	push	ax
 	pop	eax
 	cmp	eax,dword ptr [bp-4]
-	je	short @15@478
+	je	short @16@562
 	push	offset MGRP:s@
 	call	near ptr MGRP:_puts
 	pop	cx
-@15@478:
+@16@562:
    ;	
+   ;	 
    ;	 }
    ;	
 	pop	si
@@ -982,8 +1021,8 @@ _strcpy	proc	near
    ;	   for (i=0;s[i]!=0;i++) c[i]=s[i];
    ;	
 	mov	cl,0
-	jmp	short @18@114
-@18@58:
+	jmp	short @19@114
+@19@58:
 	mov	al,cl
 	mov	ah,0
 	mov	bx,ax
@@ -993,12 +1032,12 @@ _strcpy	proc	near
 	mov	bx,dx
 	mov	byte ptr [bx+si],al
 	inc	cl
-@18@114:
+@19@114:
 	mov	al,cl
 	mov	ah,0
 	mov	bx,ax
 	cmp	byte ptr [bx+di],0
-	jne	short @18@58
+	jne	short @19@58
    ;	
    ;	   c[i]=0;
    ;	
@@ -1027,16 +1066,16 @@ _strlen	proc	near
    ;	   for (i=0;s[i]!=0;i++);
    ;	
 	mov	dl,0
-	jmp	short @19@86
-@19@58:
+	jmp	short @20@86
+@20@58:
 	inc	dl
-@19@86:
+@20@86:
 	mov	al,dl
 	mov	ah,0
 	mov	bx,word ptr [bp+4]
 	add	bx,ax
 	cmp	byte ptr [bx],0
-	jne	short @19@58
+	jne	short @20@58
    ;	
    ;	   return i;
    ;	
@@ -1092,10 +1131,10 @@ _strcmp	proc	near
    ;	   for (i=0;((a[i]==b[i])&&(a[i]!=0)&&(b[i]!=0));i++);
    ;	
 	mov	byte ptr [bp-1],0
-	jmp	short @21@86
-@21@58:
+	jmp	short @22@86
+@22@58:
 	inc	byte ptr [bp-1]
-@21@86:
+@22@86:
 	mov	al,byte ptr [bp-1]
 	mov	ah,0
 	mov	bx,cx
@@ -1105,19 +1144,19 @@ _strcmp	proc	near
 	mov	dh,0
 	mov	bx,dx
 	cmp	al,byte ptr [bx+si]
-	jne	short @21@170
+	jne	short @22@170
 	mov	al,byte ptr [bp-1]
 	mov	ah,0
 	mov	bx,cx
 	add	bx,ax
 	cmp	byte ptr [bx],0
-	je	short @21@170
+	je	short @22@170
 	mov	al,byte ptr [bp-1]
 	mov	ah,0
 	mov	bx,ax
 	cmp	byte ptr [bx+si],0
-	jne	short @21@58
-@21@170:
+	jne	short @22@58
+@22@170:
    ;	
    ;	   if ( (i==strlen(a))&&(i==strlen(b))) return 0;
    ;	
@@ -1125,20 +1164,20 @@ _strcmp	proc	near
 	call	near ptr MGRP:_strlen
 	pop	cx
 	cmp	al,byte ptr [bp-1]
-	jne	short @21@254
+	jne	short @22@254
 	push	si
 	call	near ptr MGRP:_strlen
 	pop	cx
 	cmp	al,byte ptr [bp-1]
-	jne	short @21@254
+	jne	short @22@254
 	mov	al,0
-	jmp	short @21@282
-@21@254:
+	jmp	short @22@282
+@22@254:
    ;	
    ;	   else return 1;
    ;	
 	mov	al,1
-@21@282:
+@22@282:
    ;	
    ;	  }
    ;	
@@ -1168,8 +1207,8 @@ _get_argz	proc	near
    ;	 for (i=0;i<=50;i++)
    ;	
 	mov	dl,0
-	jmp	short @22@282
-@22@58:
+	jmp	short @23@282
+@23@58:
    ;	
    ;	 {
    ;	  if (line[i]!=32) { for (j=i;(line[j]!=32)&&(line[j]!=0);j++);line[j]=0;
@@ -1178,23 +1217,23 @@ _get_argz	proc	near
 	mov	ah,0
 	mov	bx,ax
 	cmp	byte ptr [bx+si],32
-	je	short @22@254
+	je	short @23@254
 	mov	cl,dl
-	jmp	short @22@142
-@22@114:
+	jmp	short @23@142
+@23@114:
 	inc	cl
-@22@142:
+@23@142:
 	mov	al,cl
 	mov	ah,0
 	mov	bx,ax
 	cmp	byte ptr [bx+si],32
-	je	short @22@198
+	je	short @23@198
 	mov	al,cl
 	mov	ah,0
 	mov	bx,ax
 	cmp	byte ptr [bx+si],0
-	jne	short @22@114
-@22@198:
+	jne	short @23@114
+@23@198:
 	mov	al,cl
 	mov	ah,0
 	mov	bx,ax
@@ -1208,17 +1247,17 @@ _get_argz	proc	near
    ;			     if (intern_count==count) break ;
    ;	
 	cmp	di,word ptr [bp+6]
-	je	short @22@310
+	je	short @23@310
    ;	
    ;			     i=j;}
    ;	
 	mov	dl,cl
-@22@254:
+@23@254:
 	inc	dl
-@22@282:
+@23@282:
 	cmp	dl,50
-	jbe	short @22@58
-@22@310:
+	jbe	short @23@58
+@23@310:
    ;	
    ;	 }
    ;	return (line+i);
@@ -1644,8 +1683,8 @@ _DispText	proc	near
    ;	 for (i=DispOfs; i <= (8000-DispOfs); i += 2)
    ;	
 	mov	si,word ptr [bp+4]
-	jmp	short @29@254
-@29@58:
+	jmp	short @30@254
+@30@58:
    ;	
    ;	 {
    ;	  cget = TextGet (TextOfs);
@@ -1658,8 +1697,8 @@ _DispText	proc	near
    ;	  if (cget==13) { do {InsertChar (0,i); i += 2;} while ( ((i+2)%160) );
    ;	
 	cmp	dl,13
-	jne	short @29@170
-@29@86:
+	jne	short @30@170
+@30@86:
 	push	si
 	push	0
 	call	near ptr MGRP:_InsertChar
@@ -1671,13 +1710,13 @@ _DispText	proc	near
 	xor	dx,dx
 	div	bx
 	or	dx,dx
-	jne	short @29@86
+	jne	short @30@86
    ;	
    ;			  TextOfs++;}
    ;	
 	inc	di
-	jmp	short @29@198
-@29@170:
+	jmp	short @30@198
+@30@170:
    ;	
    ;	  else InsertChar (cget,i);
    ;	
@@ -1685,17 +1724,17 @@ _DispText	proc	near
 	push	dx
 	call	near ptr MGRP:_InsertChar
 	add	sp,4
-@29@198:
+@30@198:
    ;	
    ;	  TextOfs++;
    ;	
 	inc	di
 	add	si,2
-@29@254:
+@30@254:
 	mov	ax,8000
 	sub	ax,word ptr [bp+4]
 	cmp	ax,si
-	jae	short @29@58
+	jae	short @30@58
    ;	
    ;	 }
    ;	
@@ -2054,8 +2093,8 @@ _LengthLine	proc	near
    ;	 for (temp=0;counter != l; temp++)
    ;	
 	xor	di,di
-	jmp	short @34@170
-@34@58:
+	jmp	short @35@170
+@35@58:
    ;	
    ;	 {
    ;	  if (TextGet (temp) == 13) { length = 0; counter++; }
@@ -2064,21 +2103,21 @@ _LengthLine	proc	near
 	call	near ptr MGRP:_TextGet
 	pop	cx
 	cmp	al,13
-	jne	short @34@114
+	jne	short @35@114
 	xor	si,si
 	inc	word ptr [bp-2]
-	jmp	short @34@142
-@34@114:
+	jmp	short @35@142
+@35@114:
    ;	
    ;	  else length++;
    ;	
 	inc	si
-@34@142:
+@35@142:
 	inc	di
-@34@170:
+@35@170:
 	mov	ax,word ptr [bp-2]
 	cmp	ax,word ptr [bp+4]
-	jne	short @34@58
+	jne	short @35@58
    ;	
    ;	 }
    ;	
@@ -2159,39 +2198,39 @@ _Characters	proc	near
 	cbw	
 	mov	word ptr [bp-2],ax
 	mov	cx,7
-	mov	bx,offset @36@C50
-@36@86:
+	mov	bx,offset @37@C50
+@37@86:
 	mov	ax,word ptr cs:[bx]
 	cmp	ax,word ptr [bp-2]
-	je	short @36@170
+	je	short @37@170
 	add	bx,2
-	loop	short @36@86
-	jmp	@36@2326
-@36@170:
+	loop	short @37@86
+	jmp	@37@2326
+@37@170:
 	jmp	word ptr cs:[bx+14]
-@36@198:
+@37@198:
    ;	
    ;	 {
    ;	
    ;	  case 72:      if ( (!startdisp) && (dispbuffer < 160)) break;
    ;	
 	cmp	word ptr MGRP:_startdisp,0
-	jne	short @36@254
+	jne	short @37@254
 	cmp	word ptr MGRP:_dispbuffer,160
 	jae short	@@0
-	jmp	@36@2802
+	jmp	@37@2802
 @@0:
-@36@254:
+@37@254:
    ;	
    ;			if ( (dispbuffer < 160) && (startdisp) )
    ;	
 	cmp	word ptr MGRP:_dispbuffer,160
 	jb short	@@1
-	jmp	@36@674
+	jmp	@37@674
 @@1:
 	cmp	word ptr MGRP:_startdisp,0
 	jne short	@@2
-	jmp	@36@674
+	jmp	@37@674
 @@2:
    ;	
    ;			{
@@ -2202,23 +2241,23 @@ _Characters	proc	near
    ;			 for (x=0;TextGet (textbuffer-x) !=10; x++) i++;
    ;	
 	xor	si,si
-	jmp	short @36@394
-@36@338:
+	jmp	short @37@394
+@37@338:
 	inc	di
 	inc	si
-@36@394:
+@37@394:
 	mov	ax,word ptr MGRP:_textbuffer
 	sub	ax,si
 	push	ax
 	call	near ptr MGRP:_TextGet
 	pop	cx
 	cmp	al,10
-	jne	short @36@338
+	jne	short @37@338
    ;	
    ;			 x++;
    ;	
-	jmp	short @36@450
-@36@450:
+	jmp	short @37@450
+@37@450:
    ;	
    ;	
    ;	
@@ -2231,13 +2270,13 @@ _Characters	proc	near
 	call	near ptr MGRP:_TextGet
 	pop	cx
 	cmp	al,10
-	je	short @36@534
+	je	short @37@534
 	mov	ax,word ptr MGRP:_textbuffer
 	sub	ax,si
 	inc	ax
 	or	ax,ax
-	jne	short @36@450
-@36@534:
+	jne	short @37@450
+@37@534:
    ;	
    ;	
    ;			 DispText (0,startdisp-x+i);
@@ -2256,23 +2295,23 @@ _Characters	proc	near
 	call	near ptr MGRP:_PeekChar
 	pop	cx
 	or	al,al
-	jne	short @36@646
+	jne	short @37@646
 	mov	ax,word ptr MGRP:_dispbuffer
 	mov	bx,160
 	xor	dx,dx
 	div	bx
 	or	dx,dx
-	je	short @36@646
+	je	short @37@646
    ;	
    ;			  {
    ;			   DispText (0,startdisp);
    ;	
 	push	word ptr MGRP:_startdisp
 	push	0
-@36@618:
+@37@618:
 	call	near ptr MGRP:_DispText
-	jmp	@36@2774
-@36@646:
+	jmp	@37@2774
+@37@646:
    ;	
    ;			   break;
    ;			  }
@@ -2286,7 +2325,7 @@ _Characters	proc	near
 	sub	ax,si
 	add	ax,di
 	mov	word ptr MGRP:_startdisp,ax
-@36@674:
+@37@674:
    ;	
    ;			}
    ;			x=0;
@@ -2300,7 +2339,7 @@ _Characters	proc	near
 	xor	dx,dx
 	div	bx
 	or	dx,dx
-	je	short @36@730
+	je	short @37@730
    ;	
    ;			else if (PeekChar (dispbuffer - 160) == 0) break;
    ;	
@@ -2311,15 +2350,15 @@ _Characters	proc	near
 	pop	cx
 	or	al,al
 	jne short	@@3
-	jmp	@36@2802
+	jmp	@37@2802
 @@3:
-@36@730:
+@37@730:
    ;	
    ;			for ( i=0; i <= 160 ; i+=2)
    ;	
 	xor	di,di
-	jmp	short @36@842
-@36@758:
+	jmp	short @37@842
+@37@758:
    ;	
    ;			 if (PeekChar (dispbuffer-i) != 0) x++;
    ;	
@@ -2329,13 +2368,13 @@ _Characters	proc	near
 	call	near ptr MGRP:_PeekChar
 	pop	cx
 	or	al,al
-	je	short @36@814
+	je	short @37@814
 	inc	si
-@36@814:
+@37@814:
 	add	di,2
-@36@842:
+@37@842:
 	cmp	di,160
-	jbe	short @36@758
+	jbe	short @37@758
    ;	
    ;	                BackgroundChar (dispbuffer,FORE_COLOR);
    ;	
@@ -2351,14 +2390,14 @@ _Characters	proc	near
 	xor	dx,dx
 	div	bx
 	or	dx,dx
-	jne	short @36@926
+	jne	short @37@926
 	mov	ax,word ptr MGRP:_dispbuffer
 	sub	ax,160
 	push	ax
 	call	near ptr MGRP:_PeekChar
 	pop	cx
 	or	al,al
-@36@926:
+@37@926:
    ;	
    ;			if ( (!(dispbuffer%160)) && (PeekChar(dispbuffer)==0) ) textbuffer--;
    ;	
@@ -2367,14 +2406,14 @@ _Characters	proc	near
 	xor	dx,dx
 	div	bx
 	or	dx,dx
-	jne	short @36@1010
+	jne	short @37@1010
 	push	word ptr MGRP:_dispbuffer
 	call	near ptr MGRP:_PeekChar
 	pop	cx
 	or	al,al
-	jne	short @36@1010
+	jne	short @37@1010
 	dec	word ptr MGRP:_textbuffer
-@36@1010:
+@37@1010:
    ;	
    ;			if ( TextGet (textbuffer)== 13)  x++;
    ;	
@@ -2382,9 +2421,9 @@ _Characters	proc	near
 	call	near ptr MGRP:_TextGet
 	pop	cx
 	cmp	al,13
-	jne	short @36@1066
+	jne	short @37@1066
 	inc	si
-@36@1066:
+@37@1066:
    ;	
    ;			textbuffer -= x+1;
    ;	
@@ -2395,8 +2434,8 @@ _Characters	proc	near
    ;			dispbuffer -= 160;
    ;	
 	sub	word ptr MGRP:_dispbuffer,160
-	jmp	@36@2746
-@36@1094:
+	jmp	@37@2746
+@37@1094:
    ;	
    ;	                BackgroundChar (dispbuffer,BACK_COLOR);
    ;			break;
@@ -2408,29 +2447,29 @@ _Characters	proc	near
    ;			for (x=0; x <= 158; x += 2) if (PeekChar (dispbuffer+x) == 26) { i=1;break;}
    ;	
 	xor	si,si
-	jmp	short @36@1206
-@36@1122:
+	jmp	short @37@1206
+@37@1122:
 	mov	ax,word ptr MGRP:_dispbuffer
 	add	ax,si
 	push	ax
 	call	near ptr MGRP:_PeekChar
 	pop	cx
 	cmp	al,26
-	jne	short @36@1178
+	jne	short @37@1178
 	mov	di,1
-	jmp	short @36@1234
-@36@1178:
+	jmp	short @37@1234
+@37@1178:
 	add	si,2
-@36@1206:
+@37@1206:
 	cmp	si,158
-	jbe	short @36@1122
-@36@1234:
+	jbe	short @37@1122
+@37@1234:
    ;	
    ;			if (i) break;
    ;	
 	or	di,di
 	je short	@@4
-	jmp	@36@2802
+	jmp	@37@2802
 @@4:
    ;	
    ;			if (!(dispbuffer%160) );
@@ -2440,7 +2479,7 @@ _Characters	proc	near
 	xor	dx,dx
 	div	bx
 	or	dx,dx
-	je	short @36@1318
+	je	short @37@1318
    ;	
    ;			else if (PeekChar (dispbuffer + 160) == 0) break;
    ;	
@@ -2451,29 +2490,29 @@ _Characters	proc	near
 	pop	cx
 	or	al,al
 	jne short	@@5
-	jmp	@36@2802
+	jmp	@37@2802
 @@5:
-@36@1318:
+@37@1318:
    ;	
    ;			if (dispbuffer >= (160*24))
    ;	
 	cmp	word ptr MGRP:_dispbuffer,3840
-	jb	short @36@1458
+	jb	short @37@1458
    ;	
    ;			{
    ;	
    ;			 for (x=0;PeekChar (x) !=0; x+=2);
    ;	
 	xor	si,si
-	jmp	short @36@1402
-@36@1374:
+	jmp	short @37@1402
+@37@1374:
 	add	si,2
-@36@1402:
+@37@1402:
 	push	si
 	call	near ptr MGRP:_PeekChar
 	pop	cx
 	or	al,al
-	jne	short @36@1374
+	jne	short @37@1374
    ;	
    ;			 //x++;
    ;			 x = x>>1;
@@ -2503,7 +2542,7 @@ _Characters	proc	near
 	mov	ax,word ptr MGRP:_startdisp
 	add	ax,si
 	mov	word ptr MGRP:_startdisp,ax
-@36@1458:
+@37@1458:
    ;	
    ;			}
    ;			x=0;
@@ -2513,8 +2552,8 @@ _Characters	proc	near
    ;			for ( i=0; i <= 160 ; i+=2)
    ;	
 	xor	di,di
-	jmp	short @36@1570
-@36@1486:
+	jmp	short @37@1570
+@37@1486:
    ;	
    ;			 {
    ;			 if (PeekChar (dispbuffer+i) != 0) x++;
@@ -2525,13 +2564,13 @@ _Characters	proc	near
 	call	near ptr MGRP:_PeekChar
 	pop	cx
 	or	al,al
-	je	short @36@1542
+	je	short @37@1542
 	inc	si
-@36@1542:
+@37@1542:
 	add	di,2
-@36@1570:
+@37@1570:
 	cmp	di,160
-	jbe	short @36@1486
+	jbe	short @37@1486
    ;	
    ;	
    ;			 }
@@ -2552,21 +2591,21 @@ _Characters	proc	near
 	xor	dx,dx
 	div	bx
 	or	dx,dx
-	jne	short @36@1710
+	jne	short @37@1710
 	mov	ax,word ptr MGRP:_dispbuffer
 	add	ax,160
 	push	ax
 	call	near ptr MGRP:_PeekChar
 	pop	cx
 	or	al,al
-	jne	short @36@1710
+	jne	short @37@1710
 	push	word ptr MGRP:_dispbuffer
 	call	near ptr MGRP:_PeekChar
 	pop	cx
 	or	al,al
-	je	short @36@1710
+	je	short @37@1710
 	inc	word ptr MGRP:_textbuffer
-@36@1710:
+@37@1710:
    ;	
    ;			if ( (!(dispbuffer%160)) && (PeekChar(dispbuffer)==0) ) textbuffer+=2;
    ;	
@@ -2575,28 +2614,28 @@ _Characters	proc	near
 	xor	dx,dx
 	div	bx
 	or	dx,dx
-	jne	short @36@1794
+	jne	short @37@1794
 	push	word ptr MGRP:_dispbuffer
 	call	near ptr MGRP:_PeekChar
 	pop	cx
 	or	al,al
-	jne	short @36@1794
+	jne	short @37@1794
 	add	word ptr MGRP:_textbuffer,2
-	jmp	short @36@1822
-@36@1794:
+	jmp	short @37@1822
+@37@1794:
    ;	
    ;			else textbuffer += x+1; // modifs
    ;	
 	mov	ax,si
 	inc	ax
 	add	word ptr MGRP:_textbuffer,ax
-@36@1822:
+@37@1822:
    ;	
    ;			dispbuffer += 160;
    ;	
 	add	word ptr MGRP:_dispbuffer,160
-	jmp	@36@2746
-@36@1850:
+	jmp	@37@2746
+@37@1850:
    ;	
    ;	                BackgroundChar (dispbuffer,BACK_COLOR);
    ;			break;
@@ -2606,7 +2645,7 @@ _Characters	proc	near
    ;	
 	cmp	word ptr MGRP:_dispbuffer,0
 	jne short	@@6
-	jmp	@36@2802
+	jmp	@37@2802
 @@6:
    ;	
    ;			if (!(dispbuffer%160)) break;
@@ -2617,7 +2656,7 @@ _Characters	proc	near
 	div	bx
 	or	dx,dx
 	jne short	@@7
-	jmp	@36@2802
+	jmp	@37@2802
 @@7:
    ;	
    ;	                BackgroundChar (dispbuffer,FORE_COLOR);
@@ -2634,8 +2673,8 @@ _Characters	proc	near
    ;			dispbuffer -= 2;
    ;	
 	sub	word ptr MGRP:_dispbuffer,2
-	jmp	@36@2746
-@36@1934:
+	jmp	@37@2746
+@37@1934:
    ;	
    ;	                BackgroundChar (dispbuffer,BACK_COLOR);
    ;			break;
@@ -2647,7 +2686,7 @@ _Characters	proc	near
 	pop	cx
 	cmp	al,26
 	jne short	@@8
-	jmp	@36@2802
+	jmp	@37@2802
 @@8:
    ;	
    ;			if (TextGet (textbuffer) == 13) break;
@@ -2657,7 +2696,7 @@ _Characters	proc	near
 	pop	cx
 	cmp	al,13
 	jne short	@@9
-	jmp	@36@2802
+	jmp	@37@2802
 @@9:
    ;	
    ;			if ( (dispbuffer%160)==79) break;
@@ -2668,7 +2707,7 @@ _Characters	proc	near
 	div	bx
 	cmp	dx,79
 	jne short	@@10
-	jmp	@36@2802
+	jmp	@37@2802
 @@10:
    ;	
    ;	                BackgroundChar (dispbuffer,FORE_COLOR);
@@ -2681,8 +2720,8 @@ _Characters	proc	near
    ;			textbuffer++;
    ;	
 	inc	word ptr MGRP:_textbuffer
-	jmp	@36@2718
-@36@2046:
+	jmp	@37@2718
+@37@2046:
    ;	
    ;			dispbuffer += 2;
    ;	                BackgroundChar (dispbuffer,BACK_COLOR);
@@ -2691,21 +2730,21 @@ _Characters	proc	near
    ;	  case 15:      for (x=0;x<=7;x++) send_char (32,57);
    ;	
 	xor	si,si
-	jmp	short @36@2130
-@36@2074:
+	jmp	short @37@2130
+@37@2074:
 	push	57
 	push	32
 	call	near ptr MGRP:_send_char
 	add	sp,4
 	inc	si
-@36@2130:
+@37@2130:
 	cmp	si,7
-	jbe	short @36@2074
+	jbe	short @37@2074
    ;	
    ;			break;
    ;	
-	jmp	@36@2802
-@36@2186:
+	jmp	@37@2802
+@37@2186:
    ;	
    ;	        
    ;	  case 14:      send_char (0,75); send_char (8,83);
@@ -2717,8 +2756,8 @@ _Characters	proc	near
 	push	83
 	push	8
 	call	near ptr MGRP:_send_char
-	jmp	@36@2774
-@36@2214:
+	jmp	@37@2774
+@37@2214:
    ;	
    ;	                break;
    ;	
@@ -2729,7 +2768,7 @@ _Characters	proc	near
 	pop	cx
 	cmp	al,26
 	jne short	@@11
-	jmp	@36@2802
+	jmp	@37@2802
 @@11:
    ;	
    ;			if (TextGet (textbuffer) == 13) DelText (textbuffer);
@@ -2738,11 +2777,11 @@ _Characters	proc	near
 	call	near ptr MGRP:_TextGet
 	pop	cx
 	cmp	al,13
-	jne	short @36@2298
+	jne	short @37@2298
 	push	word ptr MGRP:_textbuffer
 	call	near ptr MGRP:_DelText
 	pop	cx
-@36@2298:
+@37@2298:
    ;	
    ;			DelText (textbuffer);
    ;	
@@ -2754,8 +2793,8 @@ _Characters	proc	near
    ;	
 	push	word ptr MGRP:_textbuffer
 	push	word ptr MGRP:_dispbuffer
-	jmp	@36@618
-@36@2326:
+	jmp	@37@618
+@37@2326:
    ;	
    ;	
    ;			break;
@@ -2771,36 +2810,36 @@ _Characters	proc	near
    ;			if (keycode==28) InsText (10,textbuffer+1);
    ;	
 	cmp	byte ptr [bp+6],28
-	jne	short @36@2382
+	jne	short @37@2382
 	mov	ax,word ptr MGRP:_textbuffer
 	inc	ax
 	push	ax
 	push	10
 	call	near ptr MGRP:_InsText
 	add	sp,4
-@36@2382:
+@37@2382:
    ;	
    ;			if ( (keycode==28) && (dispbuffer >= (160*24)) )
    ;	
 	cmp	byte ptr [bp+6],28
-	jne	short @36@2550
+	jne	short @37@2550
 	cmp	word ptr MGRP:_dispbuffer,3840
-	jb	short @36@2550
+	jb	short @37@2550
    ;	
    ;			{
    ;	
    ;			 for (x=0;PeekChar (x) !=0; x+=2);
    ;	
 	xor	si,si
-	jmp	short @36@2494
-@36@2466:
+	jmp	short @37@2494
+@37@2466:
 	add	si,2
-@36@2494:
+@37@2494:
 	push	si
 	call	near ptr MGRP:_PeekChar
 	pop	cx
 	or	al,al
-	jne	short @36@2466
+	jne	short @37@2466
    ;	
    ;			 //x++;
    ;			 x = x>>1;
@@ -2831,8 +2870,8 @@ _Characters	proc	near
    ;	
    ;			}
    ;	
-	jmp	short @36@2578
-@36@2550:
+	jmp	short @37@2578
+@37@2550:
    ;	
    ;			else
    ;			DispText (dispbuffer,textbuffer);
@@ -2841,7 +2880,7 @@ _Characters	proc	near
 	push	word ptr MGRP:_dispbuffer
 	call	near ptr MGRP:_DispText
 	add	sp,4
-@36@2578:
+@37@2578:
    ;	
    ;	                BackgroundChar (dispbuffer,FORE_COLOR);
    ;	
@@ -2857,17 +2896,17 @@ _Characters	proc	near
    ;			if (keycode==28) textbuffer++;
    ;	
 	cmp	byte ptr [bp+6],28
-	jne	short @36@2634
+	jne	short @37@2634
 	inc	word ptr MGRP:_textbuffer
-@36@2634:
+@37@2634:
    ;	
    ;	
    ;			if ( (keycode==28) && !(dispbuffer >= (160*24)) )dispbuffer = dispbuffer + (160-(dispbuffer%160));
    ;	
 	cmp	byte ptr [bp+6],28
-	jne	short @36@2718
+	jne	short @37@2718
 	cmp	word ptr MGRP:_dispbuffer,3840
-	jae	short @36@2718
+	jae	short @37@2718
 	mov	ax,word ptr MGRP:_dispbuffer
 	mov	bx,160
 	xor	dx,dx
@@ -2877,25 +2916,25 @@ _Characters	proc	near
 	mov	dx,word ptr MGRP:_dispbuffer
 	add	dx,ax
 	mov	word ptr MGRP:_dispbuffer,dx
-	jmp	short @36@2746
-@36@2718:
+	jmp	short @37@2746
+@37@2718:
    ;	
    ;			else dispbuffer += 2;
    ;	
 	add	word ptr MGRP:_dispbuffer,2
-@36@2746:
+@37@2746:
    ;	
    ;	                BackgroundChar (dispbuffer,BACK_COLOR);
    ;	
 	push	66
 	push	word ptr MGRP:_dispbuffer
 	call	near ptr MGRP:_BackgroundChar
-@36@2774:
+@37@2774:
 	add	sp,4
    ;	
    ;			break;
    ;	
-@36@2802:
+@37@2802:
    ;	
    ;	 }
    ;	}
@@ -2905,7 +2944,7 @@ _Characters	proc	near
 	leave	
 	ret	
 _Characters	endp
-@36@C50	label	word
+@37@C50	label	word
 	db	14
 	db	0
 	db	15
@@ -2920,13 +2959,13 @@ _Characters	endp
 	db	0
 	db	83
 	db	0
-	dw	@36@2186
-	dw	@36@2046
-	dw	@36@198
-	dw	@36@1850
-	dw	@36@1934
-	dw	@36@1094
-	dw	@36@2214
+	dw	@37@2186
+	dw	@37@2046
+	dw	@37@198
+	dw	@37@1850
+	dw	@37@1934
+	dw	@37@1094
+	dw	@37@2214
 ved	label	byte
 	db	86
 	db	105
@@ -2977,15 +3016,15 @@ _textsize	proc	near
    ;	 for (i=0;(TextGet (i) != 26);i++);
    ;	
 	mov	dword ptr [bp-4],large 0
-	jmp	short @37@86
-@37@58:
+	jmp	short @38@86
+@38@58:
 	inc	dword ptr [bp-4]
-@37@86:
+@38@86:
 	push	word ptr [bp-4]
 	call	near ptr MGRP:_TextGet
 	pop	cx
 	cmp	al,26
-	jne	short @37@58
+	jne	short @38@58
    ;	
    ;	 return i;
    ;	
@@ -3098,8 +3137,8 @@ _printit	proc	near
    ;	 for (i=0; (TextGet (i) != 26); i++) printchar (TextGet(i));
    ;	
 	xor	si,si
-	jmp	short @40@114
-@40@58:
+	jmp	short @41@114
+@41@58:
 	push	si
 	call	near ptr MGRP:_TextGet
 	pop	cx
@@ -3107,39 +3146,18 @@ _printit	proc	near
 	call	near ptr MGRP:_printchar
 	pop	cx
 	inc	si
-@40@114:
+@41@114:
 	push	si
 	call	near ptr MGRP:_TextGet
 	pop	cx
 	cmp	al,26
-	jne	short @40@58
+	jne	short @41@58
    ;	
    ;	}
    ;	
 	pop	si
 	ret	
 _printit	endp
-   ;	
-   ;	char is_xsh (void)
-   ;	
-	assume	cs:MGRP
-_is_xsh	proc	near
-   ;	
-   ;	{
-   ;	 asm {
-   ;	        mov ah,4
-   ;	
-	mov	 ah,4
-   ;	
-   ;	        int 0x46
-   ;	
-	int	 046H
-   ;	
-   ;	     }
-   ;	}
-   ;	
-	ret	
-_is_xsh	endp
    ;	
    ;	void ProgramStart (char* s, char* o)
    ;	
@@ -3495,7 +3513,6 @@ s@	label	byte
 	db	0
 VPSEG	ends
 	public	_argv
-	public	_is_xsh
 	public	_printit
 	public	_printchar
 	public	_initprint
@@ -3548,6 +3565,7 @@ _ved	equ	ved
 	public	_puts
 	public	_putc
 	public	_isecho
+	public	_is_xsh
 	public	_ProgramEntry
 	public	_ProgramStart
 _s@	equ	s@

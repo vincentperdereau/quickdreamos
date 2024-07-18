@@ -15,7 +15,7 @@ $comm	macro	name,dist,size,count
 	endif
 	?debug	V 300h
 	?debug	S "xsh.c"
-	?debug	C E9305ACA58057873682E63
+	?debug	C E9845DF158057873682E63
 	?debug	C E9E34B535709737461727475702E68
 VPSEG	segment byte public use16 
 VPSEG	ends
@@ -528,7 +528,7 @@ _exec	proc	near
 	pop	bp
 	ret	
 _exec	endp
-	?debug	C E9D178C6580767726170682E68
+	?debug	C E9EE90F0580767726170682E68
 _COLOR	label	word
 	db	15
 	db	0
@@ -1469,6 +1469,146 @@ _abs	proc	near
 	ret	
 _abs	endp
    ;	
+   ;	void writenum (int x, int y, unsigned long dw,char size)
+   ;	
+	assume	cs:MGRP
+_writenum	proc	near
+	enter	4,0
+	push	si
+	push	di
+	mov	al,byte ptr [bp+12]
+   ;	
+   ;	{
+   ;	 unsigned long i ; unsigned char b ;
+   ;	 int flag=0;
+   ;	
+	xor	di,di
+   ;	
+   ;	 int j = 0;
+   ;	
+	xor	si,si
+   ;	
+   ;	
+   ;	 if (size==8) i = 100;
+   ;	
+	cmp	al,8
+	jne	short @22@86
+	mov	dword ptr [bp-4],large 100
+@22@86:
+   ;	
+   ;	 if (size==16) i = 10000;
+   ;	
+	cmp	al,16
+	jne	short @22@142
+	mov	dword ptr [bp-4],large 10000
+@22@142:
+   ;	
+   ;	 if (size==32) i = 1000000000;
+   ;	
+	cmp	al,32
+	je short	@@2
+	jmp	@22@450
+@@2:
+	mov	dword ptr [bp-4],large 03B9ACA00h
+	jmp	@22@450
+@22@198:
+   ;	
+   ;	
+   ;	 for (;i!=0;i/=10)
+   ;	 {
+   ;	 b = dw / i ; dw = dw - (b*i) ;
+   ;	
+	mov	eax,dword ptr [bp+8]
+	xor	edx,edx
+	div	dword ptr [bp-4]
+	mov	bl,al
+	mov	ah,0
+	movsx	eax,ax
+	imul	eax,dword ptr [bp-4]
+	mov	edx,dword ptr [bp+8]
+	sub	edx,eax
+	mov	dword ptr [bp+8],edx
+   ;	
+   ;	 if (b) flag = 1;
+   ;	
+	or	bl,bl
+	je	short @22@254
+	mov	di,1
+@22@254:
+   ;	
+   ;	 if (flag) PrintChar (b+48,x+(j<<3) ,y + deltaw,0,255,0);
+   ;	
+	or	di,di
+	je	short @22@310
+	push	0
+	push	255
+	push	0
+	mov	ax,word ptr [bp+6]
+	add	ax,word ptr MGRP:_deltaw
+	push	ax
+	mov	ax,si
+	shl	ax,3
+	mov	dx,word ptr [bp+4]
+	add	dx,ax
+	push	dx
+	mov	al,bl
+	add	al,48
+	push	ax
+	call	near ptr MGRP:_PrintChar
+	add	sp,12
+@22@310:
+   ;	
+   ;	 if ( (!i) && (!flag)) PrintChar (48,x+(j<<3) ,y + deltaw,0,255,0);
+   ;	
+	cmp	dword ptr [bp-4],large 0
+	jne	short @22@394
+	or	di,di
+	jne	short @22@394
+	push	0
+	push	255
+	push	0
+	mov	ax,word ptr [bp+6]
+	add	ax,word ptr MGRP:_deltaw
+	push	ax
+	mov	ax,si
+	shl	ax,3
+	mov	dx,word ptr [bp+4]
+	add	dx,ax
+	push	dx
+	push	48
+	call	near ptr MGRP:_PrintChar
+	add	sp,12
+@22@394:
+   ;	
+   ;	 j = j + 1;
+   ;	
+	inc	si
+	mov	ebx,large 10
+	mov	eax,dword ptr [bp-4]
+	xor	edx,edx
+	div	ebx
+	mov	dword ptr [bp-4],eax
+@22@450:
+	cmp	dword ptr [bp-4],large 0
+	je short	@@3
+	jmp	@22@198
+@@3:
+   ;	
+   ;	 }
+   ;	 deltaw = deltaw + 8;
+   ;	
+	mov	ax,word ptr MGRP:_deltaw
+	add	ax,8
+	mov	word ptr MGRP:_deltaw,ax
+   ;	
+   ;	}
+   ;	
+	pop	di
+	pop	si
+	leave	
+	ret	
+_writenum	endp
+   ;	
    ;	unsigned int imagesize(unsigned int x,unsigned int y,
    ;	
 	assume	cs:MGRP
@@ -1503,38 +1643,41 @@ _imagesize	proc	near
 	inc	ax
 	mov	word ptr [bp-8],ax
    ;	
-   ;	  dummy = sx*sy*4+10;        
+   ;	  dummy = (unsigned long)sx*(unsigned long)sy*4+10;   
    ;	
-	mov	ax,word ptr [bp-6]
-	imul	word ptr [bp-8]
-	shl	ax,2
-	add	ax,10
-	movzx	eax,ax
+	movzx	eax,word ptr [bp-6]
+	movzx	edx,word ptr [bp-8]
+	imul	eax,edx
+	shl	eax,2
+	add	eax,large 10
 	mov	dword ptr [bp-4],eax
    ;	
+   ;	  
+   ;	  //writenum (10,400,sx,16);
+   ;	  //writenum (110,400-8,sy,16);
+   ;	  //writenum (210,400-16,dummy,32);
+   ;	   
    ;	  if (dummy<65520) 
    ;	
 	cmp	dword ptr [bp-4],large 00000FFF0h
-	jae	short @22@86
+	jae	short @23@86
    ;	
    ;	    return dummy;
    ;	
 	mov	ax,word ptr [bp-4]
-	jmp	short @22@114
-@22@86:
+	jmp	short @23@114
+@23@86:
    ;	
    ;	  else
    ;	    {
-   ;	     MessageBox ("CreateWindow ()... Failed");
+   ;	     halt();
    ;	
-	push	offset MGRP:s@
-	call	near ptr MGRP:_MessageBox
-	pop	cx
+	call	near ptr MGRP:_halt
    ;	
    ;	     return 0;
    ;	
 	xor	ax,ax
-@22@114:
+@23@114:
    ;	
    ;	    }
    ;	}
@@ -1708,7 +1851,7 @@ _getimage2	proc	near
    ;	    inc dx
    ;	
 	inc	 dx
-@23@1094:
+@24@1094:
    ;	
    ;	}
    ;	label1:
@@ -1716,7 +1859,7 @@ _getimage2	proc	near
    ;	    mov ah,4
    ;	
 	mov	 ah,4
-@23@1122:
+@24@1122:
    ;	
    ;	    }
    ;	label2:
@@ -1751,7 +1894,7 @@ _getimage2	proc	near
    ;	
    ;	    jnz label2
    ;	
-	jne	short @23@1122
+	jne	short @24@1122
    ;	
    ;	    add m,100      ;
    ;	
@@ -1763,7 +1906,7 @@ _getimage2	proc	near
    ;	
    ;	    jnz label1
    ;	
-	jne	short @23@1094
+	jne	short @24@1094
    ;	
    ;	    dec dx
    ;	
@@ -1959,7 +2102,7 @@ _putimage2	proc	near
    ;	    inc dx
    ;	
 	inc	 dx
-@24@954:
+@25@954:
    ;	
    ;	}
    ;	olabel1:
@@ -1967,7 +2110,7 @@ _putimage2	proc	near
    ;	    mov al,8
    ;	
 	mov	 al,8
-@24@982:
+@25@982:
    ;	
    ;	}
    ;	olabel2:
@@ -1994,7 +2137,7 @@ _putimage2	proc	near
    ;	
    ;	    jnz olabel2
    ;	
-	jne	short @24@982
+	jne	short @25@982
    ;	
    ;	    add m,100 ;
    ;	
@@ -2006,7 +2149,7 @@ _putimage2	proc	near
    ;	
    ;	    jnz olabel1
    ;	
-	jne	short @24@954
+	jne	short @25@954
    ;	
    ;	    dec dx
    ;	
@@ -2143,7 +2286,7 @@ _fastbar2	proc	near
    ;	  mov ah,128
    ;	
 	mov	 ah,128
-@25@506:
+@26@506:
    ;	
    ;	}
    ;	boucle3:
@@ -2172,7 +2315,7 @@ _fastbar2	proc	near
    ;	 dec si
    ;	
 	dec	 si
-@25@674:
+@26@674:
    ;	
    ;	}
    ;	boucle2:
@@ -2251,7 +2394,7 @@ _fastbar2	proc	near
    ;	  inc di
    ;	
 	inc	 di
-@25@1150:
+@26@1150:
    ;	
    ;	//  dec di
    ;	}
@@ -2279,7 +2422,7 @@ _fastbar2	proc	near
    ;	
    ;	  jnge boucle1
    ;	
-	jl	short @25@1150
+	jl	short @26@1150
    ;	
    ;	
    ;	  cmp si,cx
@@ -2288,7 +2431,7 @@ _fastbar2	proc	near
    ;	
    ;	  jnge boucle2
    ;	
-	jl	short @25@674
+	jl	short @26@674
    ;	
    ;	
    ;	  cmp ah,0
@@ -2297,7 +2440,7 @@ _fastbar2	proc	near
    ;	
    ;	  jne boucle3
    ;	
-	jne	short @25@506
+	jne	short @26@506
    ;	
    ;	
    ;	       mov   dx,3ceh
@@ -2514,7 +2657,7 @@ _getimage1	proc	near
    ;	    inc dx
    ;	
 	inc	 dx
-@26@1010:
+@27@1010:
    ;	
    ;	}
    ;	label1:
@@ -2522,7 +2665,7 @@ _getimage1	proc	near
    ;	    mov ah,4
    ;	
 	mov	 ah,4
-@26@1038:
+@27@1038:
    ;	
    ;	    }
    ;	label2:
@@ -2557,7 +2700,7 @@ _getimage1	proc	near
    ;	
    ;	    jnz label2
    ;	
-	jne	short @26@1038
+	jne	short @27@1038
    ;	
    ;	    add m,80
    ;	
@@ -2569,7 +2712,7 @@ _getimage1	proc	near
    ;	
    ;	    jnz label1
    ;	
-	jne	short @26@1010
+	jne	short @27@1010
    ;	
    ;	    dec dx
    ;	
@@ -2753,7 +2896,7 @@ _putimage1	proc	near
    ;	    inc dx
    ;	
 	inc	 dx
-@27@870:
+@28@870:
    ;	
    ;	}
    ;	olabel1:
@@ -2761,7 +2904,7 @@ _putimage1	proc	near
    ;	    mov al,8
    ;	
 	mov	 al,8
-@27@898:
+@28@898:
    ;	
    ;	}
    ;	olabel2:
@@ -2788,7 +2931,7 @@ _putimage1	proc	near
    ;	
    ;	    jnz olabel2
    ;	
-	jne	short @27@898
+	jne	short @28@898
    ;	
    ;	    add m,80
    ;	
@@ -2800,7 +2943,7 @@ _putimage1	proc	near
    ;	
    ;	    jnz olabel1
    ;	
-	jne	short @27@870
+	jne	short @28@870
    ;	
    ;	    dec dx
    ;	
@@ -2936,7 +3079,7 @@ _fastbar1	proc	near
    ;	  mov ah,128
    ;	
 	mov	 ah,128
-@28@506:
+@29@506:
    ;	
    ;	}
    ;	boucle3:
@@ -2965,7 +3108,7 @@ _fastbar1	proc	near
    ;	 dec si
    ;	
 	dec	 si
-@28@674:
+@29@674:
    ;	
    ;	}
    ;	boucle2:
@@ -3031,7 +3174,7 @@ _fastbar1	proc	near
    ;	  inc di
    ;	
 	inc	 di
-@28@1094:
+@29@1094:
    ;	
    ;	//  dec di
    ;	}
@@ -3059,7 +3202,7 @@ _fastbar1	proc	near
    ;	
    ;	  jnge boucle1
    ;	
-	jl	short @28@1094
+	jl	short @29@1094
    ;	
    ;	
    ;	  cmp si,cx
@@ -3068,7 +3211,7 @@ _fastbar1	proc	near
    ;	
    ;	  jnge boucle2
    ;	
-	jl	short @28@674
+	jl	short @29@674
    ;	
    ;	
    ;	  cmp ah,0
@@ -3077,7 +3220,7 @@ _fastbar1	proc	near
    ;	
    ;	  jne boucle3
    ;	
-	jne	short @28@506
+	jne	short @29@506
    ;	
    ;	
    ;	       mov   dx,3ceh
@@ -3156,7 +3299,7 @@ _fastbar	proc	near
    ;	 if (gmode == 1)
    ;	
 	cmp	byte ptr MGRP:_gmode,1
-	jne	short @29@86
+	jne	short @30@86
    ;	
    ;	  fastbar1 (x,y,x2,y2);
    ;	
@@ -3165,8 +3308,8 @@ _fastbar	proc	near
 	push	dx
 	push	ax
 	call	near ptr MGRP:_fastbar1
-	jmp	short @29@114
-@29@86:
+	jmp	short @30@114
+@30@86:
    ;	
    ;	 else
    ;	  fastbar2 (x,y,x2,y2);
@@ -3176,7 +3319,7 @@ _fastbar	proc	near
 	push	dx
 	push	ax
 	call	near ptr MGRP:_fastbar2
-@29@114:
+@30@114:
 	add	sp,8
    ;	
    ;	
@@ -3251,16 +3394,16 @@ _Line	proc	near
 	pop	cx
 	pop	dx
 	cmp	dx,ax
-	jl short	@@2
-	jmp	@31@422
-@@2:
+	jl short	@@4
+	jmp	@32@422
+@@4:
    ;	
    ;	  {                                                          /* Par Y */
    ;	   if ( y1 > y2 )                            /* y1 plus grand que y2? */
    ;	
 	mov	ax,word ptr [bp+6]
 	cmp	ax,word ptr [bp+10]
-	jle	short @31@114
+	jle	short @32@114
    ;	
    ;	    {
    ;	     SwapInt( &x1, &x2 );                    /* Oui ‚change X1 et X2, */
@@ -3280,7 +3423,7 @@ _Line	proc	near
 	push	ax
 	call	near ptr MGRP:_SwapInt
 	add	sp,4
-@31@114:
+@32@114:
    ;	
    ;	    }
    ;	
@@ -3288,12 +3431,12 @@ _Line	proc	near
    ;	
 	mov	ax,word ptr [bp+8]
 	cmp	ax,word ptr [bp+4]
-	jle	short @31@170
+	jle	short @32@170
 	mov	ax,1
-	jmp	short @31@198
-@31@170:
+	jmp	short @32@198
+@32@170:
 	mov	ax,-1
-@31@198:
+@32@198:
 	mov	word ptr [bp-8],ax
    ;	
    ;	
@@ -3354,14 +3497,14 @@ _Line	proc	near
 	mov	ax,word ptr [bp+6]
 	inc	ax
 	mov	word ptr [bp-12],ax
-	jmp	short @31@366
-@31@226:
+	jmp	short @32@366
+@32@226:
    ;	
    ;	    {
    ;	     if ( d >= 0 )
    ;	
 	or	si,si
-	jl	short @31@282
+	jl	short @32@282
    ;	
    ;	      {
    ;	       x += xincr;
@@ -3374,14 +3517,14 @@ _Line	proc	near
    ;	
    ;	      }
    ;	
-	jmp	short @31@310
-@31@282:
+	jmp	short @32@310
+@32@282:
    ;	
    ;	     else
    ;	      d += bincr;
    ;	
 	add	si,word ptr [bp-6]
-@31@310:
+@32@310:
    ;	
    ;	     setpix( x, y, COLOR );
    ;	
@@ -3392,16 +3535,16 @@ _Line	proc	near
 	call	near ptr MGRP:_setpix
 	add	sp,6
 	inc	word ptr [bp-12]
-@31@366:
+@32@366:
 	mov	ax,word ptr [bp-12]
 	cmp	ax,word ptr [bp+10]
-	jle	short @31@226
+	jle	short @32@226
    ;	
    ;	    }
    ;	  }
    ;	
-	jmp	@31@758
-@31@422:
+	jmp	@32@758
+@32@422:
    ;	
    ;	 else                                                        /* par X */
    ;	  {
@@ -3409,7 +3552,7 @@ _Line	proc	near
    ;	
 	mov	ax,word ptr [bp+4]
 	cmp	ax,word ptr [bp+8]
-	jle	short @31@478
+	jle	short @32@478
    ;	
    ;	    {
    ;	     SwapInt( &x1, &x2 );                     /* Oui, ‚change X1 et X2*/
@@ -3429,7 +3572,7 @@ _Line	proc	near
 	push	ax
 	call	near ptr MGRP:_SwapInt
 	add	sp,4
-@31@478:
+@32@478:
    ;	
    ;	    }
    ;	
@@ -3437,12 +3580,12 @@ _Line	proc	near
    ;	
 	mov	ax,word ptr [bp+10]
 	cmp	ax,word ptr [bp+6]
-	jle	short @31@534
+	jle	short @32@534
 	mov	ax,1
-	jmp	short @31@562
-@31@534:
+	jmp	short @32@562
+@32@534:
 	mov	ax,-1
-@31@562:
+@32@562:
 	mov	word ptr [bp-10],ax
    ;	
    ;	
@@ -3502,14 +3645,14 @@ _Line	proc	near
    ;	
 	mov	di,word ptr [bp+4]
 	inc	di
-	jmp	short @31@730
-@31@590:
+	jmp	short @32@730
+@32@590:
    ;	
    ;	    {
    ;	     if ( d >= 0 )
    ;	
 	or	si,si
-	jl	short @31@646
+	jl	short @32@646
    ;	
    ;	      {
    ;	       y += yincr;
@@ -3523,14 +3666,14 @@ _Line	proc	near
    ;	
    ;	      }
    ;	
-	jmp	short @31@674
-@31@646:
+	jmp	short @32@674
+@32@646:
    ;	
    ;	     else
    ;	      d += bincr;
    ;	
 	add	si,word ptr [bp-6]
-@31@674:
+@32@674:
    ;	
    ;	     setpix( x, y, COLOR );
    ;	
@@ -3541,10 +3684,10 @@ _Line	proc	near
 	call	near ptr MGRP:_setpix
 	add	sp,6
 	inc	di
-@31@730:
+@32@730:
 	cmp	di,word ptr [bp+8]
-	jle	short @31@590
-@31@758:
+	jle	short @32@590
+@32@758:
    ;	
    ;	    }
    ;	  }
@@ -3572,7 +3715,7 @@ _Bar	proc	near
    ;	 if (gmode == 1)
    ;	
 	cmp	byte ptr MGRP:_gmode,1
-	jne	short @32@86
+	jne	short @33@86
    ;	
    ;	  barasm1 (x,y,w,h,COLOR);
    ;	
@@ -3583,8 +3726,8 @@ _Bar	proc	near
 	push	bx
 	push	dx
 	call	near ptr MGRP:_barasm1
-	jmp	short @32@114
-@32@86:
+	jmp	short @33@114
+@33@86:
    ;	
    ;	 else
    ;	  barasm2 (x,y,w,h,COLOR);
@@ -3596,7 +3739,7 @@ _Bar	proc	near
 	push	bx
 	push	dx
 	call	near ptr MGRP:_barasm2
-@32@114:
+@33@114:
 	add	sp,10
    ;	
    ;	}
@@ -3697,8 +3840,8 @@ _XORRectangle	proc	near
    ;	 for (i=x;i<=x2;i++)
    ;	
 	mov	si,di
-	jmp	short @35@114
-@35@58:
+	jmp	short @36@114
+@36@58:
    ;	
    ;	  {
    ;	  setpix (i,y,getpix (i,y) ^ 1);
@@ -3727,16 +3870,16 @@ _XORRectangle	proc	near
 	call	near ptr MGRP:_setpix
 	add	sp,6
 	inc	si
-@35@114:
+@36@114:
 	cmp	si,word ptr [bp+8]
-	jbe	short @35@58
+	jbe	short @36@58
    ;	
    ;	  }
    ;	 for (i=y;i<=y2;i++)
    ;	
 	mov	si,word ptr [bp+6]
-	jmp	short @35@226
-@35@170:
+	jmp	short @36@226
+@36@170:
    ;	
    ;	 {
    ;	  setpix (x,i,getpix (x,i) ^ 1);
@@ -3765,9 +3908,9 @@ _XORRectangle	proc	near
 	call	near ptr MGRP:_setpix
 	add	sp,6
 	inc	si
-@35@226:
+@36@226:
 	cmp	si,word ptr [bp+10]
-	jbe	short @35@170
+	jbe	short @36@170
    ;	
    ;	 }
    ;	}
@@ -3793,8 +3936,8 @@ _OutTextXY	proc	near
    ;	 for (i=0; s[i] != 0; i++) PrintChar (s[i],X+(i<<3) ,Y,COLOR,255,0);
    ;	
 	xor	si,si
-	jmp	short @36@114
-@36@58:
+	jmp	short @37@114
+@37@58:
 	push	0
 	push	255
 	mov	al,byte ptr MGRP:_COLOR
@@ -3811,10 +3954,10 @@ _OutTextXY	proc	near
 	call	near ptr MGRP:_PrintChar
 	add	sp,12
 	inc	si
-@36@114:
+@37@114:
 	mov	bx,si
 	cmp	byte ptr [bx+di],0
-	jne	short @36@58
+	jne	short @37@58
    ;	
    ;	}
    ;	
@@ -3837,8 +3980,8 @@ _FarOutTextXY	proc	near
    ;	 for (i=0; s[i] != 0; i++) PrintChar (s[i],X+(i<<3) ,Y,COLOR,255,0);
    ;	
 	xor	si,si
-	jmp	short @37@114
-@37@58:
+	jmp	short @38@114
+@38@58:
 	push	0
 	push	255
 	mov	al,byte ptr MGRP:_COLOR
@@ -3856,11 +3999,11 @@ _FarOutTextXY	proc	near
 	call	near ptr MGRP:_PrintChar
 	add	sp,12
 	inc	si
-@37@114:
+@38@114:
 	les	bx,dword ptr [bp+8]
 	add	bx,si
 	cmp	byte ptr es:[bx],0
-	jne	short @37@58
+	jne	short @38@58
    ;	
    ;	}
    ;	
@@ -4195,8 +4338,8 @@ _Window1	proc	near
    ;	 for (u = 0; u <= 6; u++)
    ;	
 	mov	word ptr [bp-2],0
-	jmp	short @38@114
-@38@58:
+	jmp	short @39@114
+@39@58:
    ;	
    ;	 {
    ;	  setpix (X+4+u-1+1,Y+5+u,15);
@@ -4261,9 +4404,9 @@ _Window1	proc	near
 	call	near ptr MGRP:_setpix
 	add	sp,6
 	inc	word ptr [bp-2]
-@38@114:
+@39@114:
 	cmp	word ptr [bp-2],6
-	jbe	short @38@58
+	jbe	short @39@58
    ;	
    ;	 }
    ;	
@@ -4288,11 +4431,11 @@ _Window1	proc	near
    ;	 if (isFont) setFont (2);
    ;	
 	cmp	word ptr MGRP:_isFont,0
-	je	short @38@198
+	je	short @39@198
 	push	2
 	call	near ptr MGRP:_setFont
 	pop	cx
-@38@198:
+@39@198:
    ;	
    ;	 SetColor (15);
    ;	
@@ -4723,7 +4866,7 @@ _Window2	proc	near
    ;	 if (BGWindow != 7)
    ;	
 	cmp	byte ptr MGRP:BGWindow,7
-	je	short @39@86
+	je	short @40@86
    ;	
    ;	 {
    ;	       SetColor (BGWindow);
@@ -4752,7 +4895,7 @@ _Window2	proc	near
 	push	ax
 	call	near ptr MGRP:_Bar
 	add	sp,8
-@39@86:
+@40@86:
    ;	
    ;	 }
    ;	
@@ -4930,11 +5073,11 @@ _Window2	proc	near
    ;	 if (isFont) setFont (1);
    ;	
 	cmp	word ptr MGRP:_isFont,0
-	je	short @39@142
+	je	short @40@142
 	push	1
 	call	near ptr MGRP:_setFont
 	pop	cx
-@39@142:
+@40@142:
    ;	
    ;	 OutTextXY (X+(Long>>1) - (strlen (title)<<2),Y+1,title);
    ;	
@@ -5511,19 +5654,19 @@ _Background	proc	near
    ;	 if (gmode ==1)
    ;	
 	cmp	byte ptr MGRP:_gmode,1
-	jne	short @43@86
+	jne	short @44@86
    ;	
    ;	 Bar (0,0,639,479);
    ;	
 	push	large 001DF027Fh
-	jmp	short @43@114
-@43@86:
+	jmp	short @44@114
+@44@86:
    ;	
    ;	 else
    ;	 Bar (0,0,799,599);
    ;	
 	push	large 00257031Fh
-@43@114:
+@44@114:
 	push	large 0
 	call	near ptr MGRP:_Bar
 	add	sp,8
@@ -5571,7 +5714,7 @@ _getimage	proc	near
    ;	 if (gmode == 1)
    ;	
 	cmp	byte ptr MGRP:_gmode,1
-	jne	short @44@86
+	jne	short @45@86
    ;	
    ;	  getimage1 (x,y,x0,y0,adr);
    ;	
@@ -5581,8 +5724,8 @@ _getimage	proc	near
 	push	dx
 	push	ax
 	call	near ptr MGRP:_getimage1
-	jmp	short @44@114
-@44@86:
+	jmp	short @45@114
+@45@86:
    ;	
    ;	 else 
    ;	  getimage2 (x,y,x0,y0,adr);
@@ -5593,7 +5736,7 @@ _getimage	proc	near
 	push	dx
 	push	ax
 	call	near ptr MGRP:_getimage2
-@44@114:
+@45@114:
 	add	sp,10
    ;	
    ;	
@@ -5619,7 +5762,7 @@ _putimage	proc	near
    ;	 if (gmode == 1)
    ;	
 	cmp	byte ptr MGRP:_gmode,1
-	jne	short @45@86
+	jne	short @46@86
    ;	
    ;	  putimage1 (x,y,adr);
    ;	
@@ -5627,8 +5770,8 @@ _putimage	proc	near
 	push	dx
 	push	ax
 	call	near ptr MGRP:_putimage1
-	jmp	short @45@114
-@45@86:
+	jmp	short @46@114
+@46@86:
    ;	
    ;	 else 
    ;	  putimage2 (x,y,adr);
@@ -5637,7 +5780,7 @@ _putimage	proc	near
 	push	dx
 	push	ax
 	call	near ptr MGRP:_putimage2
-@45@114:
+@46@114:
 	add	sp,6
    ;	
    ;	}
@@ -5662,19 +5805,19 @@ _shut	proc	near
    ;	 if (gmode == 1)
    ;	
 	cmp	byte ptr MGRP:_gmode,1
-	jne	short @46@282
+	jne	short @47@282
    ;	
    ;	 for (i=0;i<=480;i += 2)
    ;	
 	xor	si,si
-	jmp	short @46@226
-@46@86:
+	jmp	short @47@226
+@47@86:
    ;	
    ;	  for (j=0;j<=640;j += 2)
    ;	
 	xor	di,di
-	jmp	short @46@170
-@46@114:
+	jmp	short @47@170
+@47@114:
    ;	
    ;	   setpix (j,i,0);
    ;	
@@ -5684,28 +5827,28 @@ _shut	proc	near
 	call	near ptr MGRP:_setpix
 	add	sp,6
 	add	di,2
-@46@170:
+@47@170:
 	cmp	di,640
-	jle	short @46@114
+	jle	short @47@114
 	add	si,2
-@46@226:
+@47@226:
 	cmp	si,480
-	jle	short @46@86
-	jmp	short @46@478
-@46@282:
+	jle	short @47@86
+	jmp	short @47@478
+@47@282:
    ;	
    ;	 else
    ;	 for (i=0;i<=600;i += 2)
    ;	
 	xor	si,si
-	jmp	short @46@450
-@46@310:
+	jmp	short @47@450
+@47@310:
    ;	
    ;	  for (j=0;j<=800;j += 2)
    ;	
 	xor	di,di
-	jmp	short @46@394
-@46@338:
+	jmp	short @47@394
+@47@338:
    ;	
    ;	   setpix (j,i,0);
    ;	
@@ -5715,14 +5858,14 @@ _shut	proc	near
 	call	near ptr MGRP:_setpix
 	add	sp,6
 	add	di,2
-@46@394:
+@47@394:
 	cmp	di,800
-	jle	short @46@338
+	jle	short @47@338
 	add	si,2
-@46@450:
+@47@450:
 	cmp	si,600
-	jle	short @46@310
-@46@478:
+	jle	short @47@310
+@47@478:
    ;	
    ;	
    ;	 showmouse ();
@@ -5960,7 +6103,7 @@ _scroll_up	proc	near
    ;	if (gmode == 1)
    ;	
 	cmp	byte ptr MGRP:_gmode,1
-	jne	short @49@86
+	jne	short @50@86
    ;	
    ;	 scroll_up1 (x,y,l,h,speed);
    ;	
@@ -5971,8 +6114,8 @@ _scroll_up	proc	near
 	push	bx
 	push	dx
 	call	near ptr MGRP:_scroll_up1
-	jmp	short @49@114
-@49@86:
+	jmp	short @50@114
+@50@86:
    ;	
    ;	else
    ;	 scroll_up2 (x,y,l,h,speed);
@@ -5984,7 +6127,7 @@ _scroll_up	proc	near
 	push	bx
 	push	dx
 	call	near ptr MGRP:_scroll_up2
-@49@114:
+@50@114:
 	add	sp,10
    ;	
    ;	}
@@ -6182,8 +6325,8 @@ _HiMemoryAlloc	proc	near
 	movzx	eax,ax
 	shl	eax,10
 	mov	dword ptr [bp-8],eax
-	jmp	@53@282
-@53@58:
+	jmp	@54@282
+@54@58:
    ;	
    ;	
    ;	 while ( dummy < HiMemoryEnd )
@@ -6209,18 +6352,18 @@ _HiMemoryAlloc	proc	near
    ;	  if (Xflag == HiMemoryBlockFree)
    ;	
 	cmp	byte ptr MGRP:Xflag,90
-	je short	@@3
-	jmp	@53@198
-@@3:
+	je short	@@5
+	jmp	@54@198
+@@5:
    ;	
    ;	  {
    ;	   if (BlockSize >= size)
    ;	
 	mov	eax,dword ptr MGRP:BlockSize
 	cmp	eax,dword ptr [bp+4]
-	jae short	@@4
-	jmp	@53@170
-@@4:
+	jae short	@@6
+	jmp	@54@170
+@@6:
    ;	
    ;	   {
    ;	    Xflag = HiMemoryBlockUsed;
@@ -6256,7 +6399,7 @@ _HiMemoryAlloc	proc	near
    ;	
 	mov	eax,dword ptr [bp+4]
 	cmp	eax,dword ptr MGRP:BlockSize
-	je	short @53@170
+	je	short @54@170
    ;	
    ;	    {
    ;	     TempSize = BlockSize - size; Xflag = HiMemoryBlockFree;
@@ -6289,7 +6432,7 @@ _HiMemoryAlloc	proc	near
 	push	cs
 	call	near ptr MGRP:_himem_write
 	add	sp,12
-@53@170:
+@54@170:
    ;	
    ;	    }
    ;	   }
@@ -6297,14 +6440,14 @@ _HiMemoryAlloc	proc	near
    ;	
 	mov	eax,dword ptr [bp-4]
 	add	eax,large 5
-	jmp	@53@338
-@53@198:
+	jmp	@54@338
+@54@198:
    ;	
    ;	  }
    ;	  if (Xflag == HiMemoryBlockLast)
    ;	
 	cmp	byte ptr MGRP:Xflag,80
-	jne	short @53@254
+	jne	short @54@254
    ;	
    ;	  {
    ;	   Xflag = HiMemoryBlockUsed;
@@ -6358,8 +6501,8 @@ _HiMemoryAlloc	proc	near
 	mov	eax,dword ptr [bp-4]
 	add	eax,dword ptr MGRP:BlockSize
 	add	eax,large 10
-	jmp	short @53@338
-@53@254:
+	jmp	short @54@338
+@54@254:
    ;	
    ;	  }
    ;	  dummy = dummy + BlockSize + 5;
@@ -6368,17 +6511,17 @@ _HiMemoryAlloc	proc	near
 	add	eax,dword ptr MGRP:BlockSize
 	add	eax,large 5
 	mov	dword ptr [bp-4],eax
-@53@282:
+@54@282:
 	mov	eax,dword ptr [bp-4]
 	cmp	eax,dword ptr [bp-8]
-	jae short	@@5
-	jmp	@53@58
-@@5:
+	jae short	@@7
+	jmp	@54@58
+@@7:
    ;	
    ;	 }
    ;	 OutTextXY (10,450,"ERROR HIMEM");
    ;	
-	push	offset MGRP:s@+26
+	push	offset MGRP:s@
 	push	large 001C2000Ah
 	call	near ptr MGRP:_OutTextXY
 	add	sp,6
@@ -6386,7 +6529,7 @@ _HiMemoryAlloc	proc	near
    ;	 return 0;
    ;	
 	xor	eax,eax
-@53@338:
+@54@338:
 	shld	edx,eax,16
    ;	
    ;	}
@@ -6437,9 +6580,9 @@ _HiMemoryFree	proc	near
    ;	 if (Xflag == HiMemoryBlockUsed)
    ;	
 	cmp	byte ptr MGRP:Xflag,86
-	jne short	@@6
-	jmp	@54@282
-@@6:
+	jne short	@@8
+	jmp	@55@282
+@@8:
    ;	
    ;	 {
    ;	  Xflag = HiMemoryBlockFree;
@@ -6450,11 +6593,11 @@ _HiMemoryFree	proc	near
    ;	 if (Xflag == HiMemoryBlockLast)
    ;	
 	cmp	byte ptr MGRP:Xflag,80
-	je short	@@7
-	jmp	@54@310
-@@7:
-	jmp	short @54@226
-@54@114:
+	je short	@@9
+	jmp	@55@310
+@@9:
+	jmp	short @55@226
+@55@114:
    ;	
    ;	 {
    ;	  while ( dummy < HiMemoryEnd )
@@ -6479,20 +6622,20 @@ _HiMemoryFree	proc	near
    ;	   if (Xflag == HiMemoryBlockUsed)
    ;	
 	cmp	byte ptr MGRP:Xflag,86
-	jne	short @54@170
+	jne	short @55@170
    ;	
    ;	   {
    ;	    lastused = dummy;
    ;	
 	mov	eax,dword ptr [bp-4]
 	mov	dword ptr [bp-12],eax
-@54@170:
+@55@170:
    ;	
    ;	   }
    ;	   if (Xflag == HiMemoryBlockLast)
    ;	
 	cmp	byte ptr MGRP:Xflag,80
-	je	short @54@254
+	je	short @55@254
    ;	
    ;	   {
    ;	    break;
@@ -6503,11 +6646,11 @@ _HiMemoryFree	proc	near
 	add	eax,dword ptr MGRP:BlockSize
 	add	eax,large 5
 	mov	dword ptr [bp-4],eax
-@54@226:
+@55@226:
 	mov	eax,dword ptr [bp-4]
 	cmp	eax,dword ptr [bp-8]
-	jb	short @54@114
-@54@254:
+	jb	short @55@114
+@55@254:
    ;	
    ;	  }
    ;	 Xflag = HiMemoryBlockLast;
@@ -6525,7 +6668,7 @@ _HiMemoryFree	proc	near
    ;	
    ;	 Xflag = HiMemoryBlockFree;
    ;	
-@54@282:
+@55@282:
 	mov	byte ptr MGRP:Xflag,90
    ;	
    ;	 himem_write (_CS,(unsigned int)&Xflag,para,1);
@@ -6539,7 +6682,7 @@ _HiMemoryFree	proc	near
    ;	
    ;	 return;
    ;	
-@54@310:
+@55@310:
    ;	
    ;	 }
    ;	}
@@ -6584,432 +6727,6 @@ _HiMemoryInit	proc	near
    ;	
 	ret	
 _HiMemoryInit	endp
-	?debug	C E97A87C458077368656C6C2E68
-   ;	
-   ;	void far *get_shell (void)
-   ;	
-	assume	cs:MGRP
-_get_shell	proc	near
-	push	si
-	push	di
-   ;	
-   ;	{
-   ;	 asm {
-   ;		push si
-   ;	
-	push	 si
-   ;	
-   ;		push di
-   ;	
-	push	 di
-   ;	
-   ;		mov ah,2
-   ;	
-	mov	 ah,2
-   ;	
-   ;		int 0x46
-   ;	
-	int	 046H
-   ;	
-   ;		mov dx,si
-   ;	
-	mov	 dx,si
-   ;	
-   ;		mov ax,di
-   ;	
-	mov	 ax,di
-   ;	
-   ;		pop di
-   ;	
-	pop	 di
-   ;	
-   ;		pop si
-   ;	
-	pop	 si
-   ;	
-   ;	     }
-   ;	}
-   ;	
-	pop	di
-	pop	si
-	ret	
-_get_shell	endp
-_shX	label	word
-	db	15
-	db	0
-_shY	label	word
-	db	30
-	db	0
-   ;	
-   ;	void interrupt int29 (void)
-   ;	
-	assume	cs:MGRP
-_int29	proc	far
-	push	ax
-	push	bx
-	push	cx
-	push	dx
-	push	es
-	push	ds
-	push	si
-	push	di
-	push	bp
-	mov	bp,cs:DGROUP@
-	mov	ds,bp
-   ;	
-   ;	{
-   ;	 _BL = _AL;
-   ;	
-	mov	bl,al
-   ;	
-   ;	 _DS = _CS;
-   ;	
-	mov	ax,cs
-	mov	ds,ax
-   ;	
-   ;	 shc = _BL;
-   ;	
-	mov	byte ptr MGRP:_shc,bl
-   ;	
-   ;	
-   ;	 if (shX < ((64*8)+15-8)) PrintChar ('_',shX,shY,0,255,0);
-   ;	
-	cmp	word ptr MGRP:_shX,519
-	jge	short @57@86
-	push	0
-	push	255
-	push	0
-	push	word ptr MGRP:_shY
-	push	word ptr MGRP:_shX
-	push	95
-	call	near ptr MGRP:_PrintChar
-	add	sp,12
-@57@86:
-   ;	
-   ;	 switch (shc)
-   ;	
-	mov	al,byte ptr MGRP:_shc
-	cbw	
-	cmp	ax,8
-	je	short @57@282
-	cmp	ax,10
-	je	short @57@226
-	cmp	ax,13
-	jne	short @57@338
-   ;	
-   ;	 {
-   ;	  case 13: shX = 15;
-   ;	
-	mov	word ptr MGRP:_shX,15
-   ;	
-   ;		   break;
-   ;	
-	jmp	@57@506
-@57@226:
-   ;	
-   ;	  case 10: if (shY == (30+ 12 *16)) break;
-   ;	
-	cmp	word ptr MGRP:_shY,222
-	jne short	@@8
-	jmp	@57@506
-@@8:
-   ;	
-   ;		   shY += 16;
-   ;	
-	add	word ptr MGRP:_shY,16
-   ;	
-   ;		   break;
-   ;	
-	jmp	@57@506
-@57@282:
-   ;	
-   ;	  case 8:  if (shX == 15) break;
-   ;	
-	cmp	word ptr MGRP:_shX,15
-	jne short	@@9
-	jmp	@57@506
-@@9:
-   ;	
-   ;		   shX = shX - 8;
-   ;	
-	mov	ax,word ptr MGRP:_shX
-	add	ax,-8
-	mov	word ptr MGRP:_shX,ax
-   ;	
-   ;		   SetColor (0);
-   ;	
-	push	0
-	call	near ptr MGRP:_SetColor
-	pop	cx
-   ;	
-   ;		   Bar (shX,shY,shX+8,shY+16);
-   ;	
-	mov	ax,word ptr MGRP:_shY
-	add	ax,16
-	push	ax
-	mov	ax,word ptr MGRP:_shX
-	add	ax,8
-	push	ax
-	push	word ptr MGRP:_shY
-	push	word ptr MGRP:_shX
-	call	near ptr MGRP:_Bar
-	add	sp,8
-	jmp	short @57@478
-@57@338:
-   ;	
-   ;		   PrintChar ('_',shX,shY,7,255,0);
-   ;		   break;
-   ;	  default:
-   ;		    if (shY >= (30+ 11 *16))
-   ;	
-	cmp	word ptr MGRP:_shY,206
-	jl	short @57@394
-   ;	
-   ;		    {
-   ;		     scroll_up (13,46,65*8+8, 12*16 , 16);
-   ;	
-	push	16
-	push	large 000C00210h
-	push	large 0002E000Dh
-	call	near ptr MGRP:_scroll_up
-	add	sp,10
-   ;	
-   ;		     shY -= 16;
-   ;	
-	sub	word ptr MGRP:_shY,16
-@57@394:
-   ;	
-   ;		    }
-   ;		    if (shX == ((64*8)+15)) { shX = 15; shY += 16; };
-   ;	
-	cmp	word ptr MGRP:_shX,527
-	jne	short @57@450
-	mov	word ptr MGRP:_shX,15
-	add	word ptr MGRP:_shY,16
-@57@450:
-   ;	
-   ;		    PrintChar (shc,shX,shY,7,255,0);
-   ;	
-	push	0
-	push	255
-	push	7
-	push	word ptr MGRP:_shY
-	push	word ptr MGRP:_shX
-	mov	al,byte ptr MGRP:_shc
-	push	ax
-	call	near ptr MGRP:_PrintChar
-	add	sp,12
-   ;	
-   ;		    shX = shX + 8;
-   ;	
-	mov	ax,word ptr MGRP:_shX
-	add	ax,8
-	mov	word ptr MGRP:_shX,ax
-   ;	
-   ;		    if (shX < ((64*8)+15-8)) PrintChar ('_',shX,shY,7,255,0);
-   ;	
-	cmp	word ptr MGRP:_shX,519
-	jge	short @57@506
-@57@478:
-	push	0
-	push	255
-	push	7
-	push	word ptr MGRP:_shY
-	push	word ptr MGRP:_shX
-	push	95
-	call	near ptr MGRP:_PrintChar
-	add	sp,12
-@57@506:
-   ;	
-   ;	 }
-   ;	
-   ;	
-   ;	}
-   ;	
-	pop	bp
-	pop	di
-	pop	si
-	pop	ds
-	pop	es
-	pop	dx
-	pop	cx
-	pop	bx
-	pop	ax
-	iret	
-_int29	endp
-   ;	
-   ;	void set_int_29 (void)
-   ;	
-	assume	cs:MGRP
-_set_int_29	proc	near
-   ;	
-   ;	{
-   ;	 asm {
-   ;		push ax
-   ;	
-	push	 ax
-   ;	
-   ;		push bx
-   ;	
-	push	 bx
-   ;	
-   ;		push es
-   ;	
-	push	 es
-   ;	
-   ;		mov ax,0
-   ;	
-	mov	 ax,0
-   ;	
-   ;		mov es,ax
-   ;	
-	mov	 es,ax
-   ;	
-   ;		mov ax,cs
-   ;	
-	mov	 ax,cs
-   ;	
-   ;		mov bx,offset int29
-   ;	
-	mov	 bx,offset _int29
-   ;	
-   ;		mov es:[0x29 * 4],bx
-   ;	
-	mov	 es:[029H * 4],bx
-   ;	
-   ;		mov es:[0x29 * 4 +2],ax
-   ;	
-	mov	 es:[029H * 4 +2],ax
-   ;	
-   ;		pop es
-   ;	
-	pop	 es
-   ;	
-   ;		pop bx
-   ;	
-	pop	 bx
-   ;	
-   ;		pop ax
-   ;	
-	pop	 ax
-   ;	
-   ;	     }
-   ;	}
-   ;	
-	ret	
-_set_int_29	endp
-   ;	
-   ;	void console (void)
-   ;	
-	assume	cs:MGRP
-_console	proc	near
-	enter	4,0
-   ;	
-   ;	{
-   ;	 unsigned long mbuf;
-   ;	
-   ;	 hidemouse ();
-   ;	
-	call	near ptr MGRP:_hidemouse
-   ;	
-   ;	 mbuf = save_area (8,8,66*8,15*16+3);
-   ;	
-	push	large 000F30210h
-	push	large 000080008h
-	call	near ptr MGRP:_save_area
-	push	dx
-	push	ax
-	pop	eax
-	add	sp,8
-	mov	dword ptr [bp-4],eax
-   ;	
-   ;	 shX = 15;
-   ;	
-	mov	word ptr MGRP:_shX,15
-   ;	
-   ;	 shY = 30;
-   ;	
-	mov	word ptr MGRP:_shY,30
-   ;	
-   ;	 BGWindow = 0;
-   ;	
-	mov	byte ptr MGRP:BGWindow,0
-   ;	
-   ;	 Window (8,10,65*8,15*16-1,3,"terminal");
-   ;	
-	push	offset MGRP:s@+38
-	push	large 0000300EFh
-	push	large 00208000Ah
-	push	8
-	call	near ptr MGRP:_Window
-	add	sp,12
-   ;	
-   ;	 SetColor (0);
-   ;	
-	push	0
-	call	near ptr MGRP:_SetColor
-	pop	cx
-   ;	
-   ;	 //fastbar (16,27,65*8,15*16+5);
-   ;	 set_int_29 ();
-   ;	
-	call	near ptr MGRP:_set_int_29
-   ;	
-   ;	 shell = get_shell();
-   ;	
-	call	near ptr MGRP:_get_shell
-	mov	word ptr MGRP:_shell+2,dx
-	mov	word ptr MGRP:_shell,ax
-   ;	
-   ;	 setFont (0);
-   ;	
-	push	0
-	call	near ptr MGRP:_setFont
-	pop	cx
-   ;	
-   ;	 shell ();
-   ;	
-	call	dword ptr MGRP:_shell
-   ;	
-   ;	  _DS = _CS;
-   ;	
-	mov	ax,cs
-	mov	ds,ax
-   ;	
-   ;	 setFont (0);
-   ;	
-	push	0
-	call	near ptr MGRP:_setFont
-	pop	cx
-   ;	
-   ;	  restore_area (8,8,66*8,15*16+3,mbuf,1);
-   ;	
-	push	1
-	push	dword ptr [bp-4]
-	push	large 000F30210h
-	push	large 000080008h
-	call	near ptr MGRP:_restore_area
-	add	sp,14
-   ;	
-   ;	 asm {
-   ;	       mov ah,5
-   ;	
-	mov	 ah,5
-   ;	
-   ;	       int 0x46
-   ;	
-	int	 046H
-   ;	
-   ;	    }
-   ;	 showmouse ();
-   ;	
-	call	near ptr MGRP:_showmouse
-   ;	
-   ;	}
-   ;	
-	leave	
-	ret	
-_console	endp
    ;	
    ;	unsigned int malloc (int pg)
    ;	
@@ -7067,7 +6784,7 @@ _free	proc	near
 	ret	
 _free	endp
    ;	
-   ;	unsigned int avail (void)
+   ;	unsigned long avail (void)
    ;	
 	assume	cs:MGRP
 _avail	proc	near
@@ -7081,6 +6798,10 @@ _avail	proc	near
    ;	       int 0x44
    ;	
 	int	 044H
+   ;	
+   ;	       mov dx,0
+   ;	
+	mov	 dx,0
    ;	
    ;	      } 
    ;	}
@@ -7215,8 +6936,8 @@ _PosString	proc	near
    ;	
 	xor	dx,dx
 	xor	cx,cx
-	jmp	short @67@114
-@67@58:
+	jmp	short @64@114
+@64@58:
    ;	
    ;	 while ( j != pos)
    ;	 {
@@ -7227,11 +6948,11 @@ _PosString	proc	near
 	les	bx,dword ptr [bp+4]
 	add	bx,ax
 	cmp	byte ptr es:[bx],0
-	jne	short @67@114
+	jne	short @64@114
 	inc	dx
-@67@114:
+@64@114:
 	cmp	dx,word ptr [bp+8]
-	jne	short @67@58
+	jne	short @64@58
    ;	
    ;	 }
    ;	 return k;
@@ -7350,12 +7071,778 @@ protectedWnd	label	dword
 	db	0
 	db	0
 	db	0
+	?debug	C E9C07EEF58077368656C6C2E68
+   ;	
+   ;	void far *get_shell (void)
+   ;	
+	assume	cs:MGRP
+_get_shell	proc	near
+	push	si
+	push	di
+   ;	
+   ;	{
+   ;	 asm {
+   ;		push si
+   ;	
+	push	 si
+   ;	
+   ;		push di
+   ;	
+	push	 di
+   ;	
+   ;		mov ah,2
+   ;	
+	mov	 ah,2
+   ;	
+   ;		int 0x46
+   ;	
+	int	 046H
+   ;	
+   ;		mov dx,si
+   ;	
+	mov	 dx,si
+   ;	
+   ;		mov ax,di
+   ;	
+	mov	 ax,di
+   ;	
+   ;		pop di
+   ;	
+	pop	 di
+   ;	
+   ;		pop si
+   ;	
+	pop	 si
+   ;	
+   ;	     }
+   ;	}
+   ;	
+	pop	di
+	pop	si
+	ret	
+_get_shell	endp
+_shX	label	word
+	db	25
+	db	0
+_shY	label	word
+	db	30
+	db	0
+_ix	label	word
+	db	25
+	db	0
+_iy	label	word
+	db	30
+	db	0
+_wx	label	word
+	db	8
+	db	0
+_wy	label	word
+	db	10
+	db	0
+_exiting	label	word
+	db	0
+	db	0
+   ;	
+   ;	void interrupt int29 (void)
+   ;	
+	assume	cs:MGRP
+_int29	proc	far
+	push	ax
+	push	bx
+	push	cx
+	push	dx
+	push	es
+	push	ds
+	push	si
+	push	di
+	push	bp
+	mov	bp,cs:DGROUP@
+	mov	ds,bp
+   ;	
+   ;	{    
+   ;	 _BL = _AL;
+   ;	
+	mov	bl,al
+   ;	
+   ;	 _DS = _CS;
+   ;	
+	mov	ax,cs
+	mov	ds,ax
+   ;	
+   ;	 shc = _BL;
+   ;	
+	mov	byte ptr MGRP:_shc,bl
+   ;	
+   ;	
+   ;	 if (shc == ((char)1)) 
+   ;	
+	cmp	byte ptr MGRP:_shc,1
+	jne	short @66@86
+   ;	
+   ;	 {
+   ;	    DestroyWindow(hWndSh);
+   ;	
+	push	dword ptr MGRP:_hWndSh
+	call	near ptr MGRP:_DestroyWindow
+	add	sp,4
+   ;	
+   ;	    exiting = 1;
+   ;	
+	mov	word ptr MGRP:_exiting,1
+   ;	
+   ;	    return;
+   ;	
+	jmp	@66@450
+@66@86:
+   ;	
+   ;	 }
+   ;	
+   ;	 if (shX < ((64*8)+ix-8)) PrintChar ('_',shX,shY,0,255,0);
+   ;	
+	mov	ax,word ptr MGRP:_ix
+	add	ax,504
+	cmp	ax,word ptr MGRP:_shX
+	jle	short @66@142
+	push	0
+	push	255
+	push	0
+	push	word ptr MGRP:_shY
+	push	word ptr MGRP:_shX
+	push	95
+	call	near ptr MGRP:_PrintChar
+	add	sp,12
+@66@142:
+   ;	
+   ;	 switch (shc)
+   ;	
+	mov	al,byte ptr MGRP:_shc
+	cbw	
+	cmp	ax,8
+	je	short @66@338
+	cmp	ax,10
+	je	short @66@282
+	cmp	ax,13
+	je short	@@10
+	jmp	@66@422
+@@10:
+   ;	
+   ;	 {
+   ;	  case 13: shX = ix;
+   ;	
+	mov	ax,word ptr MGRP:_ix
+	mov	word ptr MGRP:_shX,ax
+   ;	
+   ;		   break;
+   ;	
+	jmp	@66@450
+@66@282:
+   ;	
+   ;	  case 10: if (shY == (iy+ 12 *16)) break;
+   ;	
+	mov	ax,word ptr MGRP:_iy
+	add	ax,192
+	cmp	ax,word ptr MGRP:_shY
+	jne short	@@11
+	jmp	@66@450
+@@11:
+   ;	
+   ;		   shY += 16;
+   ;	
+	add	word ptr MGRP:_shY,16
+   ;	
+   ;		   break;
+   ;	
+	jmp	@66@450
+@66@338:
+   ;	
+   ;	  case 8:  if (shX == ix) {SetColor (3);Bar (shX,shY,shX+8,shY+16); break; };
+   ;	
+	mov	ax,word ptr MGRP:_shX
+	cmp	ax,word ptr MGRP:_ix
+	jne	short @66@394
+	push	3
+	call	near ptr MGRP:_SetColor
+	pop	cx
+	mov	ax,word ptr MGRP:_shY
+	add	ax,16
+	push	ax
+	mov	ax,word ptr MGRP:_shX
+	add	ax,8
+	push	ax
+	push	word ptr MGRP:_shY
+	push	word ptr MGRP:_shX
+	call	near ptr MGRP:_Bar
+	add	sp,8
+	jmp	short @66@450
+@66@394:
+   ;	
+   ;		   shX = shX - 8;
+   ;	
+	mov	ax,word ptr MGRP:_shX
+	add	ax,-8
+	mov	word ptr MGRP:_shX,ax
+   ;	
+   ;		   SetColor (0);
+   ;	
+	push	0
+	call	near ptr MGRP:_SetColor
+	pop	cx
+   ;	
+   ;		   Bar (shX,shY,shX+8,shY+16);
+   ;	
+	mov	ax,word ptr MGRP:_shY
+	add	ax,16
+	push	ax
+	mov	ax,word ptr MGRP:_shX
+	add	ax,8
+	push	ax
+	push	word ptr MGRP:_shY
+	push	word ptr MGRP:_shX
+	call	near ptr MGRP:_Bar
+	add	sp,8
+   ;	
+   ;		   PrintChar ('_',shX,shY,7,255,0);
+   ;	
+	push	0
+	push	255
+	push	7
+	push	word ptr MGRP:_shY
+	push	word ptr MGRP:_shX
+	push	95
+	call	near ptr MGRP:_PrintChar
+	add	sp,12
+   ;	
+   ;		   break;
+   ;	
+	jmp	short @66@450
+@66@422:
+   ;	
+   ;	  default:
+   ;	       displayChar(shc);
+   ;	
+	mov	al,byte ptr MGRP:_shc
+	push	ax
+	call	near ptr MGRP:_displayChar
+	pop	cx
+@66@450:
+   ;	
+   ;	 }
+   ;	 
+   ;	}
+   ;	
+	pop	bp
+	pop	di
+	pop	si
+	pop	ds
+	pop	es
+	pop	dx
+	pop	cx
+	pop	bx
+	pop	ax
+	iret	
+_int29	endp
+   ;	
+   ;	void displayChar(char sch) 
+   ;	
+	assume	cs:MGRP
+_displayChar	proc	near
+	push	bp
+	mov	bp,sp
+   ;	
+   ;	{
+   ;	    if (shY >= (iy+ 11 *16))
+   ;	
+	mov	ax,word ptr MGRP:_iy
+	add	ax,176
+	cmp	ax,word ptr MGRP:_shY
+	jg	short @67@86
+   ;	
+   ;	    {
+   ;	     scroll_up (ix-2,iy+16,65*8+8, 12*16-2 , 16);
+   ;	
+	push	16
+	push	large 000BE0210h
+	mov	ax,word ptr MGRP:_iy
+	add	ax,16
+	push	ax
+	mov	ax,word ptr MGRP:_ix
+	add	ax,-2
+	push	ax
+	call	near ptr MGRP:_scroll_up
+	add	sp,10
+   ;	
+   ;	     shY -= 16;
+   ;	
+	sub	word ptr MGRP:_shY,16
+@67@86:
+   ;	
+   ;	    }
+   ;	    if (shX == ((64*8)+ix)) { shX = ix; shY += 16; };
+   ;	
+	mov	ax,word ptr MGRP:_ix
+	add	ax,512
+	cmp	ax,word ptr MGRP:_shX
+	jne	short @67@142
+	mov	ax,word ptr MGRP:_ix
+	mov	word ptr MGRP:_shX,ax
+	add	word ptr MGRP:_shY,16
+@67@142:
+   ;	
+   ;	    PrintChar (shc,shX,shY,7,255,0);
+   ;	
+	push	0
+	push	255
+	push	7
+	push	word ptr MGRP:_shY
+	push	word ptr MGRP:_shX
+	mov	al,byte ptr MGRP:_shc
+	push	ax
+	call	near ptr MGRP:_PrintChar
+	add	sp,12
+   ;	
+   ;	    shX = shX + 8;
+   ;	
+	mov	ax,word ptr MGRP:_shX
+	add	ax,8
+	mov	word ptr MGRP:_shX,ax
+   ;	
+   ;	    if (shX < ((64*8)+ix-8)) PrintChar ('_',shX,shY,7,255,0);
+   ;	
+	mov	ax,word ptr MGRP:_ix
+	add	ax,504
+	cmp	ax,word ptr MGRP:_shX
+	jle	short @67@198
+	push	0
+	push	255
+	push	7
+	push	word ptr MGRP:_shY
+	push	word ptr MGRP:_shX
+	push	95
+	call	near ptr MGRP:_PrintChar
+	add	sp,12
+@67@198:
+   ;	
+   ;	}  
+   ;	
+	pop	bp
+	ret	
+_displayChar	endp
+   ;	
+   ;	void set_int_29 (void)
+   ;	
+	assume	cs:MGRP
+_set_int_29	proc	near
+   ;	
+   ;	{
+   ;	 asm {
+   ;		push ax
+   ;	
+	push	 ax
+   ;	
+   ;		push bx
+   ;	
+	push	 bx
+   ;	
+   ;		push es
+   ;	
+	push	 es
+   ;	
+   ;		mov ax,0
+   ;	
+	mov	 ax,0
+   ;	
+   ;		mov es,ax
+   ;	
+	mov	 es,ax
+   ;	
+   ;		mov ax,cs
+   ;	
+	mov	 ax,cs
+   ;	
+   ;		mov bx,offset int29
+   ;	
+	mov	 bx,offset _int29
+   ;	
+   ;		mov es:[0x29 * 4],bx
+   ;	
+	mov	 es:[029H * 4],bx
+   ;	
+   ;		mov es:[0x29 * 4 +2],ax
+   ;	
+	mov	 es:[029H * 4 +2],ax
+   ;	
+   ;		pop es
+   ;	
+	pop	 es
+   ;	
+   ;		pop bx
+   ;	
+	pop	 bx
+   ;	
+   ;		pop ax
+   ;	
+	pop	 ax
+   ;	
+   ;	     }
+   ;	}
+   ;	
+	ret	
+_set_int_29	endp
+   ;	
+   ;	void far WinMainSh (void)
+   ;	
+	assume	cs:MGRP
+_WinMainSh	proc	far
+   ;	
+   ;	{
+   ;	 FuncEntry
+   ;	
+ 	cli	 
+ 	pusha	 
+	mov	ax,ds
+	mov	bx,cs
+	mov	ds,bx
+	mov	word ptr MGRP:DataSegmentSh,ax
+   ;	
+   ;	
+   ;	  if (WM_MESSAGE == WINDOW_DESTROY)
+   ;	
+	cmp	byte ptr MGRP:_SysBuf+1,176
+	jne	short @69@170
+   ;	
+   ;	  {
+   ;	     shX = 25; shY = 30;
+   ;	
+	mov	word ptr MGRP:_shX,25
+	mov	word ptr MGRP:_shY,30
+   ;	
+   ;	     ix = 25;  iy = 30;
+   ;	
+	mov	word ptr MGRP:_ix,25
+	mov	word ptr MGRP:_iy,30
+   ;	
+   ;	     wx = 8;  wy = 10;
+   ;	
+	mov	word ptr MGRP:_wx,8
+	mov	word ptr MGRP:_wy,10
+   ;	
+   ;	     
+   ;	     asm {
+   ;	       mov ah,5
+   ;	
+	mov	 ah,5
+   ;	
+   ;	       int 0x46
+   ;	
+	int	 046H
+@69@170:
+   ;	
+   ;	     }
+   ;	  }
+   ;	  
+   ;	  if (WM_MESSAGE == KEYB_CLICK)
+   ;	
+	cmp	byte ptr MGRP:_SysBuf+1,161
+	je short	@@12
+	jmp	@69@366
+@@12:
+   ;	
+   ;	  {
+   ;	   _DS = _CS;              
+   ;	
+	mov	ax,cs
+	mov	ds,ax
+   ;	
+   ;	   keysh = SysBuf.word1;
+   ;	
+	mov	ax,word ptr MGRP:_SysBuf+3
+	mov	word ptr MGRP:_keysh,ax
+   ;	
+   ;	   
+   ;	   if ((char)keysh != 8)
+   ;	
+	cmp	byte ptr MGRP:_keysh,8
+	jne short	@@13
+	jmp	@69@366
+@@13:
+   ;	
+   ;	   {
+   ;	       ix = ix + (hWndSh->x - wx) - delta;
+   ;	
+	les	bx,dword ptr MGRP:_hWndSh
+	mov	ax,word ptr es:[bx]
+	sub	ax,word ptr MGRP:_wx
+	mov	dx,word ptr MGRP:_ix
+	add	dx,ax
+	sub	dx,word ptr MGRP:_delta
+	mov	word ptr MGRP:_ix,dx
+   ;	
+   ;	       iy = iy + (hWndSh->y - wy);
+   ;	
+	mov	ax,word ptr es:[bx+2]
+	sub	ax,word ptr MGRP:_wy
+	mov	dx,word ptr MGRP:_iy
+	add	dx,ax
+	mov	word ptr MGRP:_iy,dx
+   ;	
+   ;	       shX = shX + (hWndSh->x - wx) - delta;
+   ;	
+	mov	ax,word ptr es:[bx]
+	sub	ax,word ptr MGRP:_wx
+	mov	dx,word ptr MGRP:_shX
+	add	dx,ax
+	sub	dx,word ptr MGRP:_delta
+	mov	word ptr MGRP:_shX,dx
+   ;	
+   ;	       shY = shY + (hWndSh->y - wy);
+   ;	
+	mov	ax,word ptr es:[bx+2]
+	sub	ax,word ptr MGRP:_wy
+	mov	dx,word ptr MGRP:_shY
+	add	dx,ax
+	mov	word ptr MGRP:_shY,dx
+   ;	
+   ;	       
+   ;	       wx = hWndSh->x;
+   ;	
+	mov	ax,word ptr es:[bx]
+	mov	word ptr MGRP:_wx,ax
+   ;	
+   ;	       wy = hWndSh->y;
+   ;	
+	mov	ax,word ptr es:[bx+2]
+	mov	word ptr MGRP:_wy,ax
+   ;	
+   ;	       delta = (hWndSh->x - wx);
+   ;	
+	mov	ax,word ptr es:[bx]
+	sub	ax,word ptr MGRP:_wx
+	mov	word ptr MGRP:_delta,ax
+   ;	
+   ;	       
+   ;	       exiting = 0;
+   ;	
+	mov	word ptr MGRP:_exiting,0
+   ;	
+   ;	       shell ((char)keysh);
+   ;	
+	mov	al,byte ptr MGRP:_keysh
+	push	ax
+	call	dword ptr MGRP:_shell
+	pop	cx
+   ;	
+   ;	        _DS = _CS;
+   ;	
+	mov	ax,cs
+	mov	ds,ax
+   ;	
+   ;	
+   ;	       if ( (hWndSh != topWnd) && (!exiting) )
+   ;	
+	mov	eax,dword ptr MGRP:_hWndSh
+	cmp	eax,dword ptr MGRP:topWnd
+	je	short @69@310
+	cmp	word ptr MGRP:_exiting,0
+	jne	short @69@310
+   ;	
+   ;	       {
+   ;	          SwitchWindow(hWndSh);
+   ;	
+	push	dword ptr MGRP:_hWndSh
+	call	near ptr MGRP:_SwitchWindow
+	add	sp,4
+@69@310:
+   ;	
+   ;	       }   
+   ;	       if (!exiting)
+   ;	
+	cmp	word ptr MGRP:_exiting,0
+	jne	short @69@366
+   ;	
+   ;	       {
+   ;	          shell ((char)2);
+   ;	
+	push	2
+	call	dword ptr MGRP:_shell
+	pop	cx
+   ;	
+   ;	          _DS = _CS;
+   ;	
+	mov	ax,cs
+	mov	ds,ax
+@69@366:
+   ;	
+   ;	       }
+   ;	    }
+   ;	  }
+   ;	
+   ;	
+   ;	 FuncEnd
+   ;	
+	mov	ax,word ptr MGRP:DataSegmentSh
+	mov	ds,ax
+ 	popa	 
+ 	sti	 
+ 	retf	 
+   ;	
+   ;	}
+   ;	
+	ret	
+_WinMainSh	endp
+   ;	
+   ;	void console (void)
+   ;	
+	assume	cs:MGRP
+_console	proc	near
+   ;	
+   ;	{
+   ;	 unsigned long mbuf;
+   ;	
+   ;	 hidemouse ();
+   ;	
+	call	near ptr MGRP:_hidemouse
+   ;	
+   ;	 //mbuf = save_area (8,8,66*8,15*16+3);
+   ;	 shX = 15;
+   ;	
+	mov	word ptr MGRP:_shX,15
+   ;	
+   ;	 shY = 30;
+   ;	
+	mov	word ptr MGRP:_shY,30
+   ;	
+   ;	 BGWindow = 0;
+   ;	
+	mov	byte ptr MGRP:BGWindow,0
+   ;	
+   ;	 //Window (8,10,65*8,15*16-1,3,"shell");
+   ;	 hWndSh = CreateWindow (wx,wy,65*8,15*16-1,3,"Shell");
+   ;	
+	push	offset MGRP:s@+12
+	push	3
+	push	large 000EF0208h
+	push	word ptr MGRP:_wy
+	push	word ptr MGRP:_wx
+	call	near ptr MGRP:_CreateWindow
+	add	sp,12
+	mov	word ptr MGRP:_hWndSh+2,dx
+	mov	word ptr MGRP:_hWndSh,ax
+   ;	
+   ;	 delta = (hWndSh->x - wx);
+   ;	
+	les	bx,dword ptr MGRP:_hWndSh
+	mov	ax,word ptr es:[bx]
+	sub	ax,word ptr MGRP:_wx
+	mov	word ptr MGRP:_delta,ax
+   ;	
+   ;	
+   ;	 ix = ix + (hWndSh->x - wx) - delta;
+   ;	
+	mov	ax,word ptr es:[bx]
+	sub	ax,word ptr MGRP:_wx
+	mov	dx,word ptr MGRP:_ix
+	add	dx,ax
+	sub	dx,word ptr MGRP:_delta
+	mov	word ptr MGRP:_ix,dx
+   ;	
+   ;	 iy = iy + (hWndSh->y - wy);
+   ;	
+	mov	ax,word ptr es:[bx+2]
+	sub	ax,word ptr MGRP:_wy
+	mov	dx,word ptr MGRP:_iy
+	add	dx,ax
+	mov	word ptr MGRP:_iy,dx
+   ;	
+   ;	 shX = shX + (hWndSh->x - wx);
+   ;	
+	mov	ax,word ptr es:[bx]
+	sub	ax,word ptr MGRP:_wx
+	mov	dx,word ptr MGRP:_shX
+	add	dx,ax
+	mov	word ptr MGRP:_shX,dx
+   ;	
+   ;	 shY = shY + (hWndSh->y - wy);
+   ;	
+	mov	ax,word ptr es:[bx+2]
+	sub	ax,word ptr MGRP:_wy
+	mov	dx,word ptr MGRP:_shY
+	add	dx,ax
+	mov	word ptr MGRP:_shY,dx
+   ;	
+   ;	
+   ;	 hWndSh->WinMain = (void far*) (_CS * 65536 + (unsigned int)&WinMainSh);
+   ;	
+	mov	ax,cs
+	movzx	eax,ax
+	shl	eax,16
+	mov	dx,offset MGRP:_WinMainSh
+	movzx	edx,dx
+	add	eax,edx
+	shld	edx,eax,16
+	mov	word ptr es:[bx+18],dx
+	mov	word ptr es:[bx+16],ax
+   ;	
+   ;	 SetColor (0);
+   ;	
+	push	0
+	call	near ptr MGRP:_SetColor
+	pop	cx
+   ;	
+   ;	 //fastbar (16,27,65*8,15*16+5);
+   ;	 set_int_29 ();
+   ;	
+	call	near ptr MGRP:_set_int_29
+   ;	
+   ;	 shell = get_shell();
+   ;	
+	call	near ptr MGRP:_get_shell
+	mov	word ptr MGRP:_shell+2,dx
+	mov	word ptr MGRP:_shell,ax
+   ;	
+   ;	 setFont (0);
+   ;	
+	push	0
+	call	near ptr MGRP:_setFont
+	pop	cx
+   ;	
+   ;	 exiting = 0;
+   ;	
+	mov	word ptr MGRP:_exiting,0
+   ;	
+   ;	 shell ((char)2);
+   ;	
+	push	2
+	call	dword ptr MGRP:_shell
+	pop	cx
+   ;	
+   ;	  _DS = _CS;
+   ;	
+	mov	ax,cs
+	mov	ds,ax
+   ;	
+   ;	 setFont (0);
+   ;	
+	push	0
+	call	near ptr MGRP:_setFont
+	pop	cx
+   ;	
+   ;	/*
+   ;	 restore_area (8,8,66*8,15*16+3,mbuf,1);
+   ;	*/
+   ;	 showmouse ();
+   ;	
+	call	near ptr MGRP:_showmouse
+   ;	
+   ;	}
+   ;	
+	ret	
+_console	endp
    ;	
    ;	unsigned long save_area (int x, int y, int w, int h)
    ;	
 	assume	cs:MGRP
 _save_area	proc	near
-	enter	6,0
+	enter	8,0
 	push	si
 	push	di
 	mov	si,word ptr [bp+4]
@@ -7364,8 +7851,9 @@ _save_area	proc	near
    ;	{
    ;	 unsigned int ret;
    ;	 unsigned long xadr;
+   ;	 unsigned int size;
    ;	
-   ;	 ret = malloc ( (imagesize (x,y,x+w,y+h) >> 4) + 1 );
+   ;	 size = imagesize (x,y,x+w,y+h);
    ;	
 	mov	ax,di
 	add	ax,word ptr [bp+10]
@@ -7377,6 +7865,11 @@ _save_area	proc	near
 	push	si
 	call	near ptr MGRP:_imagesize
 	add	sp,8
+	mov	word ptr [bp-8],ax
+   ;	
+   ;	
+   ;	 ret = malloc ( (size >> 4) + 1 );
+   ;	
 	shr	ax,4
 	inc	ax
 	push	ax
@@ -7531,11 +8024,11 @@ _restore_area	proc	near
    ;	 if (rel) HiMemoryFree (ret);
    ;	
 	cmp	byte ptr [bp+16],0
-	je	short @69@86
+	je	short @72@86
 	push	dword ptr [bp+12]
 	call	near ptr MGRP:_HiMemoryFree
 	add	sp,4
-@69@86:
+@72@86:
    ;	
    ;	}
    ;	
@@ -7558,9 +8051,9 @@ _InitFullApp	proc	near
    ;	 if (gmode == 1)
    ;	
 	cmp	byte ptr MGRP:_gmode,1
-	je short	@@10
-	jmp	@70@58
-@@10:
+	je short	@@14
+	jmp	@73@58
+@@14:
    ;	
    ;	 {
    ;	  screen_seg1 = save_area (0,0  ,640,96);
@@ -7611,8 +8104,8 @@ _InitFullApp	proc	near
    ;	
 	push	large 000600280h
 	push	384
-	jmp	short @70@86
-@70@58:
+	jmp	short @73@86
+@73@58:
    ;	
    ;	 }
    ;	 else
@@ -7665,7 +8158,7 @@ _InitFullApp	proc	near
    ;	
 	push	large 000780320h
 	push	480
-@70@86:
+@73@86:
 	push	0
 	call	near ptr MGRP:_save_area
 	push	dx
@@ -7703,9 +8196,9 @@ _CloseFullApp	proc	near
    ;	 if (gmode == 1)
    ;	
 	cmp	byte ptr MGRP:_gmode,1
-	je short	@@11
-	jmp	@71@58
-@@11:
+	je short	@@15
+	jmp	@74@58
+@@15:
    ;	
    ;	 {
    ;	 restore_area (0,0  ,640,96,screen_seg1,1);
@@ -7750,8 +8243,8 @@ _CloseFullApp	proc	near
 	push	dword ptr MGRP:_screen_seg5
 	push	large 000600280h
 	push	384
-	jmp	@71@86
-@71@58:
+	jmp	@74@86
+@74@58:
    ;	
    ;	 }
    ;	 else
@@ -7798,7 +8291,7 @@ _CloseFullApp	proc	near
 	push	dword ptr MGRP:_screen_seg5
 	push	large 000780320h
 	push	480
-@71@86:
+@74@86:
 	push	0
 	call	near ptr MGRP:_restore_area
 	add	sp,14
@@ -7828,11 +8321,43 @@ _CreateWindow	proc	near
 	mov	bp,sp
 	push	si
 	push	di
-	mov	si,word ptr [bp+4]
-	mov	di,word ptr [bp+8]
+	mov	di,word ptr [bp+4]
+	mov	si,word ptr [bp+8]
    ;	
    ;	{
    ;	 // CONTROL LastEditBox;
+   ;	 
+   ;	 if (( ((((unsigned long)w) / 8) + 1) * (unsigned long)h * 4) > 65520)
+   ;	
+	movsx	eax,si
+	shr	eax,3
+	inc	eax
+	movsx	edx,word ptr [bp+10]
+	imul	eax,edx
+	shl	eax,2
+	cmp	eax,large 00000FFF0h
+	jbe	short @75@86
+   ;	
+   ;	 {
+   ;	    MessageBox ("Window too big"); 
+   ;	
+	push	offset MGRP:s@+18
+	call	near ptr MGRP:_MessageBox
+	pop	cx
+   ;	
+   ;	    Xgetch();     
+   ;	
+	call	near ptr MGRP:_Xgetch
+   ;	
+   ;	    return 0;   
+   ;	
+	xor	dx,dx
+	xor	ax,ax
+	jmp	@75@310
+@75@86:
+   ;	
+   ;	 }
+   ;	 
    ;	
    ;	 hidemouse ();
    ;	
@@ -7843,7 +8368,7 @@ _CreateWindow	proc	near
    ;	  if (activeEditBox != (CONTROL)0 )
    ;	
 	cmp	dword ptr MGRP:_activeEditBox,large 0
-	je	short @72@86
+	je	short @75@142
    ;	
    ;	  {
    ;	   SetColor (15);
@@ -7901,7 +8426,7 @@ _CreateWindow	proc	near
 	push	dx
 	call	near ptr MGRP:_Line
 	add	sp,8
-@72@86:
+@75@142:
    ;	
    ;	  }
    ;	
@@ -7914,27 +8439,27 @@ _CreateWindow	proc	near
    ;	
    ;	 x = (( (x >> 3) + 1) << 3);
    ;	
-	sar	si,3
-	inc	si
-	shl	si,3
-   ;	
-   ;	 w = (( (w >> 3) + 1) << 3);
-   ;	
 	sar	di,3
 	inc	di
 	shl	di,3
+   ;	
+   ;	 w = (( (w >> 3) + 1) << 3);
+   ;	
+	sar	si,3
+	inc	si
+	shl	si,3
    ;	
    ;	
    ;	 if ( is_full_app == 0 )
    ;	
 	cmp	byte ptr MGRP:is_full_app,0
-	jne	short @72@170
+	jne	short @75@226
    ;	
    ;	 {
    ;	  if ( topWnd != 0 )
    ;	
 	cmp	dword ptr MGRP:topWnd,large 0
-	je	short @72@170
+	je	short @75@226
    ;	
    ;	   topWnd->form = save_area (topWnd->x,topWnd->y,topWnd->w-8,topWnd->h);
    ;	
@@ -7952,7 +8477,7 @@ _CreateWindow	proc	near
 	add	sp,8
 	les	bx,dword ptr MGRP:topWnd
 	mov	dword ptr es:[bx+8],eax
-@72@170:
+@75@226:
    ;	
    ;	 }
    ;	
@@ -7974,7 +8499,7 @@ _CreateWindow	proc	near
    ;	 dumWnd->x = x;
    ;	
 	les	bx,dword ptr MGRP:dumWnd
-	mov	word ptr es:[bx],si
+	mov	word ptr es:[bx],di
    ;	
    ;	 dumWnd->y = y;
    ;	
@@ -7983,7 +8508,7 @@ _CreateWindow	proc	near
    ;	
    ;	 dumWnd->w = w;
    ;	
-	mov	word ptr es:[bx+4],di
+	mov	word ptr es:[bx+4],si
    ;	
    ;	 dumWnd->h = h;
    ;	
@@ -8005,9 +8530,9 @@ _CreateWindow	proc	near
 	cbw	
 	push	ax
 	push	word ptr [bp+10]
-	push	di
-	push	word ptr [bp+6]
 	push	si
+	push	word ptr [bp+6]
+	push	di
 	call	near ptr MGRP:_Window
 	add	sp,12
    ;	
@@ -8049,6 +8574,7 @@ _CreateWindow	proc	near
    ;	
 	mov	dx,word ptr MGRP:dumWnd+2
 	mov	ax,word ptr MGRP:dumWnd
+@75@310:
    ;	
    ;	}
    ;	
@@ -8071,18 +8597,18 @@ _NextWindow	proc	near
    ;	
 	mov	eax,dword ptr [bp+4]
 	cmp	eax,dword ptr MGRP:topWnd
-	jne	short @73@86
+	jne	short @76@86
 	mov	dx,word ptr MGRP:topWnd+2
 	mov	ax,word ptr MGRP:topWnd
-	jmp	short @73@226
-@73@86:
+	jmp	short @76@226
+@76@86:
    ;	
    ;	
    ;	 tempWnd = topWnd;
    ;	
 	mov	eax,dword ptr MGRP:topWnd
-	jmp	short @73@142
-@73@114:
+	jmp	short @76@142
+@76@114:
    ;	
    ;	
    ;	 while (tempWnd->prev != Wnd)
@@ -8091,12 +8617,12 @@ _NextWindow	proc	near
    ;	
 	les	bx,dword ptr [bp-4]
 	mov	eax,dword ptr es:[bx+12]
-@73@142:
+@76@142:
 	mov	dword ptr [bp-4],eax
 	les	bx,dword ptr [bp-4]
 	mov	eax,dword ptr es:[bx+12]
 	cmp	eax,dword ptr [bp+4]
-	jne	short @73@114
+	jne	short @76@114
    ;	
    ;	//  if (tempWnd = (HWND)0) return (HWND)0;
    ;	 }
@@ -8104,7 +8630,7 @@ _NextWindow	proc	near
    ;	
 	mov	dx,word ptr [bp-2]
 	mov	ax,word ptr [bp-4]
-@73@226:
+@76@226:
    ;	
    ;	}
    ;	
@@ -8125,7 +8651,7 @@ _DestroyControl	proc	near
    ;	
 	les	bx,dword ptr [bp+4]
 	mov	eax,dword ptr es:[bx+24]
-@74@58:
+@77@58:
 	mov	dword ptr MGRP:dumControl,eax
    ;	
    ;	 while (1)
@@ -8155,13 +8681,13 @@ _DestroyControl	proc	near
 	les	bx,dword ptr [bp+4]
 	mov	eax,dword ptr es:[bx+20]
 	cmp	eax,dword ptr MGRP:dumControl
-	je	short @74@142
+	je	short @77@142
    ;	
    ;	  dumControl = tempControl;
    ;	
 	mov	eax,dword ptr MGRP:tempControl
-	jmp	short @74@58
-@74@142:
+	jmp	short @77@58
+@77@142:
    ;	
    ;	 }
    ;	}
@@ -8185,9 +8711,9 @@ _DestroyWindow	proc	near
    ;	
 	mov	eax,dword ptr [bp+4]
 	cmp	eax,dword ptr MGRP:topWnd
-	je short	@@12
-	jmp	@75@646
-@@12:
+	je short	@@16
+	jmp	@78@646
+@@16:
    ;	
    ;	
    ;	 hidemouse ();
@@ -8207,7 +8733,7 @@ _DestroyWindow	proc	near
    ;	 if ( is_full_app == 0 )
    ;	
 	cmp	byte ptr MGRP:is_full_app,0
-	jne	short @75@198
+	jne	short @78@198
    ;	
    ;	 {
    ;	 
@@ -8228,8 +8754,8 @@ _DestroyWindow	proc	near
    ;	  tempWnd = NextWindow ((HWND)0);
    ;	
 	push	large 0
-	jmp	short @75@142
-@75@114:
+	jmp	short @78@142
+@78@114:
    ;	
    ;	
    ;	  while (tempWnd != dmWnd)
@@ -8257,15 +8783,15 @@ _DestroyWindow	proc	near
    ;	   tempWnd = NextWindow (tempWnd);
    ;	
 	push	dword ptr [bp-4]
-@75@142:
+@78@142:
 	call	near ptr MGRP:_NextWindow
 	add	sp,4
 	mov	word ptr [bp-2],dx
 	mov	word ptr [bp-4],ax
 	mov	eax,dword ptr [bp-4]
 	cmp	eax,dword ptr [bp+4]
-	jne	short @75@114
-@75@198:
+	jne	short @78@114
+@78@198:
    ;	
    ;	  }
    ;	 
@@ -8288,9 +8814,9 @@ _DestroyWindow	proc	near
    ;	 if (is_full_app == 1) CloseFullApp ();
    ;	
 	cmp	byte ptr MGRP:is_full_app,1
-	jne	short @75@254
+	jne	short @78@254
 	call	near ptr MGRP:_CloseFullApp
-@75@254:
+@78@254:
    ;	
    ;	
    ;	 SysBuf.byte1 = WINDOW_DESTROY;
@@ -8301,20 +8827,20 @@ _DestroyWindow	proc	near
    ;	
 	les	bx,dword ptr [bp+4]
 	cmp	dword ptr es:[bx+16],large 0
-	je	short @75@310
+	je	short @78@310
 	call	dword ptr es:[bx+16]
-@75@310:
+@78@310:
    ;	
    ;	
    ;	 if (dmWnd->form != 0) HiMemoryFree (dmWnd->form);
    ;	
 	les	bx,dword ptr [bp+4]
 	cmp	dword ptr es:[bx+8],large 0
-	je	short @75@366
+	je	short @78@366
 	push	dword ptr es:[bx+8]
 	call	near ptr MGRP:_HiMemoryFree
 	add	sp,4
-@75@366:
+@78@366:
    ;	
    ;	 
    ;	 dm = (unsigned int) ( (unsigned long)(dmWnd) >> 16 );
@@ -8329,6 +8855,7 @@ _DestroyWindow	proc	near
 	call	near ptr MGRP:_free
 	pop	cx
    ;	
+   ;	
    ;	 showmouse ();
    ;	
 	call	near ptr MGRP:_showmouse
@@ -8338,7 +8865,7 @@ _DestroyWindow	proc	near
    ;	 if ( topWnd == (HWND)0 )
    ;	
 	cmp	dword ptr MGRP:topWnd,large 0
-	jne	short @75@422
+	jne	short @78@422
    ;	
    ;	 {
    ;	  activeButton = (CONTROL)0;
@@ -8351,8 +8878,8 @@ _DestroyWindow	proc	near
    ;	
    ;	  return;
    ;	
-	jmp	@75@646
-@75@422:
+	jmp	@78@646
+@78@422:
    ;	
    ;	 }
    ;	
@@ -8367,14 +8894,14 @@ _DestroyWindow	proc	near
    ;	
 	les	bx,dword ptr MGRP:tempControl
 	cmp	byte ptr es:[bx+8],2
-	jne	short @75@478
+	jne	short @78@478
    ;	
    ;	  activeEditBox = topWnd->ActiveControl;
    ;	
 	les	bx,dword ptr MGRP:topWnd
 	mov	dword ptr MGRP:_activeEditBox,eax
-	jmp	short @75@506
-@75@478:
+	jmp	short @78@506
+@78@478:
    ;	
    ;	 else
    ;	  activeEditBox = FindLastEditBox (topWnd);
@@ -8384,22 +8911,22 @@ _DestroyWindow	proc	near
 	add	sp,4
 	mov	word ptr MGRP:_activeEditBox+2,dx
 	mov	word ptr MGRP:_activeEditBox,ax
-@75@506:
+@78@506:
    ;	
    ;	
    ;	 if ( tempControl->ControlType == CONTROL_TYPE_BUTTON)
    ;	
 	les	bx,dword ptr MGRP:tempControl
 	cmp	byte ptr es:[bx+8],1
-	jne	short @75@562
+	jne	short @78@562
    ;	
    ;	  activeButton = topWnd->ActiveControl;
    ;	
 	les	bx,dword ptr MGRP:topWnd
 	mov	eax,dword ptr es:[bx+28]
 	mov	dword ptr MGRP:_activeButton,eax
-	jmp	short @75@590
-@75@562:
+	jmp	short @78@590
+@78@562:
    ;	
    ;	 else
    ;	  activeButton = FindLastButton (topWnd);
@@ -8409,7 +8936,7 @@ _DestroyWindow	proc	near
 	add	sp,4
 	mov	word ptr MGRP:_activeButton+2,dx
 	mov	word ptr MGRP:_activeButton,ax
-@75@590:
+@78@590:
    ;	
    ;	
    ;	 SetColor (0);
@@ -8422,7 +8949,7 @@ _DestroyWindow	proc	near
    ;	 if (activeEditBox != (CONTROL)0)
    ;	
 	cmp	dword ptr MGRP:_activeEditBox,large 0
-	je	short @75@646
+	je	short @78@646
    ;	
    ;	 {
    ;	  memcpy (_CS,(unsigned int)TempString,activeEditBox->StrSegment,activeEditBox->StrOffset,49);
@@ -8474,7 +9001,7 @@ _DestroyWindow	proc	near
 	push	dx
 	call	near ptr MGRP:_Line
 	add	sp,8
-@75@646:
+@78@646:
    ;	
    ;	 }
    ;	
@@ -8490,8 +9017,8 @@ _DestroyWindow	endp
    ;	
 	assume	cs:MGRP
 _DestroyAllWindows	proc	near
-	jmp	short @76@86
-@76@30:
+	jmp	short @79@86
+@79@30:
    ;	
    ;	{
    ;	
@@ -8501,17 +9028,17 @@ _DestroyAllWindows	proc	near
    ;	
 	mov	eax,dword ptr MGRP:topWnd
 	cmp	eax,dword ptr MGRP:protectedWnd
-	je	short @76@114
+	je	short @79@114
    ;	
    ;	  DestroyWindow (topWnd);
    ;	
 	push	dword ptr MGRP:topWnd
 	call	near ptr MGRP:_DestroyWindow
 	add	sp,4
-@76@86:
+@79@86:
 	cmp	dword ptr MGRP:topWnd,large 0
-	jne	short @76@30
-@76@114:
+	jne	short @79@30
+@79@114:
    ;	
    ;	 }
    ;	 
@@ -8534,21 +9061,21 @@ _SwitchWindow	proc	near
    ;	 //CONTROL LastEditBox;
    ;	 unsigned int mret;
    ;	
-   ;	 if (is_full_app) return;
+   ;	 if (is_full_app == 1) return;
    ;	
-	cmp	byte ptr MGRP:is_full_app,0
-	je short	@@13
-	jmp	@77@478
-@@13:
+	cmp	byte ptr MGRP:is_full_app,1
+	jne short	@@17
+	jmp	@80@478
+@@17:
    ;	
    ;	
    ;	 if (vhWnd == topWnd) return;
    ;	
 	mov	eax,dword ptr [bp+4]
 	cmp	eax,dword ptr MGRP:topWnd
-	jne short	@@14
-	jmp	@77@478
-@@14:
+	jne short	@@18
+	jmp	@80@478
+@@18:
    ;	
    ;	
    ;	 hidemouse ();
@@ -8559,7 +9086,7 @@ _SwitchWindow	proc	near
    ;	
 	les	bx,dword ptr MGRP:topWnd
 	cmp	dword ptr es:[bx+8],large 0
-	jne	short @77@142
+	jne	short @80@142
    ;	
    ;	  topWnd->form = save_area (topWnd->x,topWnd->y,topWnd->w-8,topWnd->h);
    ;	
@@ -8576,8 +9103,8 @@ _SwitchWindow	proc	near
 	add	sp,8
 	les	bx,dword ptr MGRP:topWnd
 	mov	dword ptr es:[bx+8],eax
-	jmp	@77@170
-@77@142:
+	jmp	@80@170
+@80@142:
    ;	
    ;	 else
    ;	 {
@@ -8658,14 +9185,14 @@ _SwitchWindow	proc	near
 	push	di
 	call	near ptr MGRP:_free
 	pop	cx
-@77@170:
+@80@170:
    ;	
    ;	 }
    ;	
    ;	  if (activeEditBox != (CONTROL)0 )
    ;	
 	cmp	dword ptr MGRP:_activeEditBox,large 0
-	je	short @77@226
+	je	short @80@226
    ;	
    ;	  {
    ;	   SetColor (15);
@@ -8723,11 +9250,9 @@ _SwitchWindow	proc	near
 	push	dx
 	call	near ptr MGRP:_Line
 	add	sp,8
-@77@226:
+@80@226:
    ;	
    ;	  }
-   ;	
-   ;	
    ;	
    ;	 restore_area (vhWnd->x,vhWnd->y,vhWnd->w-8,vhWnd->h,vhWnd->form,0);
    ;	
@@ -8782,14 +9307,14 @@ _SwitchWindow	proc	near
    ;	
 	les	bx,dword ptr MGRP:tempControl
 	cmp	byte ptr es:[bx+8],2
-	jne	short @77@282
+	jne	short @80@282
    ;	
    ;	  activeEditBox = topWnd->ActiveControl;
    ;	
 	les	bx,dword ptr MGRP:topWnd
 	mov	dword ptr MGRP:_activeEditBox,eax
-	jmp	short @77@310
-@77@282:
+	jmp	short @80@310
+@80@282:
    ;	
    ;	 else
    ;	  activeEditBox = FindLastEditBox (topWnd);
@@ -8799,7 +9324,7 @@ _SwitchWindow	proc	near
 	add	sp,4
 	mov	word ptr MGRP:_activeEditBox+2,dx
 	mov	word ptr MGRP:_activeEditBox,ax
-@77@310:
+@80@310:
    ;	
    ;	
    ;	 tempControl = topWnd->ActiveControl;
@@ -8812,14 +9337,14 @@ _SwitchWindow	proc	near
    ;	
 	les	bx,dword ptr MGRP:tempControl
 	cmp	byte ptr es:[bx+8],1
-	jne	short @77@366
+	jne	short @80@366
    ;	
    ;	  activeButton = topWnd->ActiveControl;
    ;	
 	les	bx,dword ptr MGRP:topWnd
 	mov	dword ptr MGRP:_activeButton,eax
-	jmp	short @77@394
-@77@366:
+	jmp	short @80@394
+@80@366:
    ;	
    ;	 else
    ;	  activeButton = FindLastButton (topWnd);
@@ -8829,7 +9354,7 @@ _SwitchWindow	proc	near
 	add	sp,4
 	mov	word ptr MGRP:_activeButton+2,dx
 	mov	word ptr MGRP:_activeButton,ax
-@77@394:
+@80@394:
    ;	
    ;	
    ;	
@@ -8843,7 +9368,7 @@ _SwitchWindow	proc	near
    ;	 if (activeEditBox != (CONTROL)0)
    ;	
 	cmp	dword ptr MGRP:_activeEditBox,large 0
-	je	short @77@450
+	je	short @80@450
    ;	
    ;	 {
    ;	  memcpy (_CS,(unsigned int)TempString,activeEditBox->StrSegment,activeEditBox->StrOffset,49);
@@ -8895,7 +9420,7 @@ _SwitchWindow	proc	near
 	push	dx
 	call	near ptr MGRP:_Line
 	add	sp,8
-@77@450:
+@80@450:
    ;	
    ;	 }
    ;	
@@ -8903,7 +9428,7 @@ _SwitchWindow	proc	near
    ;	 showmouse ();
    ;	
 	call	near ptr MGRP:_showmouse
-@77@478:
+@80@478:
    ;	
    ;	}
    ;	
@@ -8922,18 +9447,18 @@ _TurnWindow	proc	near
    ;	 if (topWnd == (HWND)0) return;
    ;	
 	cmp	dword ptr MGRP:topWnd,large 0
-	je	short @78@114
+	je	short @81@114
    ;	
    ;	 if (topWnd->prev == (HWND)0) return;
    ;	
 	les	bx,dword ptr MGRP:topWnd
 	cmp	dword ptr es:[bx+12],large 0
-	je	short @78@114
+	je	short @81@114
    ;	
    ;	 if (is_full_app) return;
    ;	
 	cmp	byte ptr MGRP:is_full_app,0
-	jne	short @78@114
+	jne	short @81@114
    ;	
    ;	 SwitchWindow ( NextWindow ( (HWND)0 ) );
    ;	
@@ -8944,7 +9469,7 @@ _TurnWindow	proc	near
 	push	ax
 	call	near ptr MGRP:_SwitchWindow
 	add	sp,4
-@78@114:
+@81@114:
    ;	
    ;	}
    ;	
@@ -9003,19 +9528,19 @@ _MoveWindow	proc	near
    ;	 MouseB = 1;
    ;	
 	mov	word ptr MGRP:MouseB,1
-	jmp	@79@674
-@79@58:
+	jmp	@82@674
+@82@58:
    ;	
    ;	 while ( MouseB == 1 )
    ;	 {
    ;	  if ( (oldWx != Wx) || (oldWy != Wy) )
    ;	
 	cmp	word ptr [bp-10],di
-	jne	short @79@114
+	jne	short @82@114
 	mov	ax,word ptr [bp-12]
 	cmp	ax,word ptr [bp-4]
-	je	short @79@142
-@79@114:
+	je	short @82@142
+@82@114:
    ;	
    ;	  {
    ;	   XORRectangle (oldWx,oldWy,oldWx+topWnd->w,oldWy+topWnd->h);
@@ -9045,7 +9570,7 @@ _MoveWindow	proc	near
 	push	di
 	call	near ptr MGRP:_XORRectangle
 	add	sp,8
-@79@142:
+@82@142:
    ;	
    ;	  }
    ;	  oldWx = Wx; oldWy = Wy;
@@ -9131,11 +9656,11 @@ _MoveWindow	proc	near
 	mov	ax,word ptr MGRP:MouseY
 	sub	ax,word ptr [bp-8]
 	mov	word ptr [bp-4],ax
-@79@674:
+@82@674:
 	cmp	word ptr MGRP:MouseB,1
-	jne short	@@15
-	jmp	@79@58
-@@15:
+	jne short	@@19
+	jmp	@82@58
+@@19:
    ;	
    ;	 }
    ;	   XORRectangle (topWnd->x,topWnd->y,topWnd->x+topWnd->w,topWnd->y+topWnd->h);
@@ -9170,11 +9695,12 @@ _MoveWindow	proc	near
 	call	near ptr MGRP:_XORRectangle
 	add	sp,8
    ;	
+   ;	 
    ;	 if (topWnd->form == 0)
    ;	
 	les	bx,dword ptr MGRP:topWnd
 	cmp	dword ptr es:[bx+8],large 0
-	jne	short @79@758
+	jne	short @82@758
    ;	
    ;	  topWnd->form = save_area (topWnd->x,topWnd->y,topWnd->w-8,topWnd->h);
    ;	
@@ -9191,11 +9717,11 @@ _MoveWindow	proc	near
 	add	sp,8
 	les	bx,dword ptr MGRP:topWnd
 	mov	dword ptr es:[bx+8],eax
-	jmp	@79@786
-@79@758:
+	jmp	@82@786
+@82@758:
    ;	
    ;	 else
-   ;	 {
+   ;	 { 
    ;	  mret = malloc ( (imagesize (topWnd->x,topWnd->y,topWnd->x+topWnd->w-8,topWnd->y+topWnd->h) >> 4) + 1 );
    ;	
 	les	bx,dword ptr MGRP:topWnd
@@ -9273,9 +9799,11 @@ _MoveWindow	proc	near
 	push	word ptr [bp-2]
 	call	near ptr MGRP:_free
 	pop	cx
-@79@786:
+@82@786:
    ;	
    ;	 }
+   ;	
+   ;	
    ;	
    ;	 SetColor (backc);
    ;	
@@ -9304,8 +9832,8 @@ _MoveWindow	proc	near
    ;	 dumWnd = NextWindow ((HWND)0);
    ;	
 	push	large 0
-	jmp	short @79@842
-@79@814:
+	jmp	short @82@842
+@82@814:
    ;	
    ;	
    ;	 while (dumWnd != topWnd)
@@ -9331,14 +9859,14 @@ _MoveWindow	proc	near
    ;	  dumWnd = NextWindow (dumWnd);
    ;	
 	push	dword ptr MGRP:dumWnd
-@79@842:
+@82@842:
 	call	near ptr MGRP:_NextWindow
 	add	sp,4
 	mov	word ptr MGRP:dumWnd+2,dx
 	mov	word ptr MGRP:dumWnd,ax
 	mov	eax,dword ptr MGRP:dumWnd
 	cmp	eax,dword ptr MGRP:topWnd
-	jne	short @79@814
+	jne	short @82@814
    ;	
    ;	 }
    ;	 Wx = (( (Wx >> 3) + 1) << 3);
@@ -9351,7 +9879,7 @@ _MoveWindow	proc	near
    ;	
 	les	bx,dword ptr MGRP:topWnd
 	mov	eax,dword ptr es:[bx+24]
-@79@926:
+@82@926:
 	mov	dword ptr MGRP:dumControl,eax
    ;	
    ;	 while (1)
@@ -9386,13 +9914,13 @@ _MoveWindow	proc	near
 	les	bx,dword ptr MGRP:topWnd
 	mov	eax,dword ptr es:[bx+20]
 	cmp	eax,dword ptr MGRP:dumControl
-	je	short @79@1010
+	je	short @82@1010
    ;	
    ;	  dumControl = tempControl;
    ;	
 	mov	eax,dword ptr MGRP:tempControl
-	jmp	short @79@926
-@79@1010:
+	jmp	short @82@926
+@82@1010:
    ;	
    ;	 }
    ;	 topWnd->x = Wx; topWnd->y = Wy;
@@ -9435,34 +9963,34 @@ _MessageBox	proc	near
 	mov	bp,sp
 	push	si
 	push	di
-	mov	di,word ptr [bp+4]
+	mov	si,word ptr [bp+4]
    ;	
    ;	{
    ;	 unsigned int Lg;
    ;	 Lg = ( (strlen (Msg) * 8) / 2 );
    ;	
-	push	di
+	push	si
 	call	near ptr MGRP:_strlen
 	pop	cx
 	mov	ah,0
 	shl	ax,3
 	cwd	
 	sub	ax,dx
-	mov	si,ax
-	sar	si,1
+	mov	di,ax
+	sar	di,1
    ;	
-   ;	 CreateWindow (320-Lg-15,200,(Lg*2)+20,50,3,"Desktop");
+   ;	 CreateWindow (320-Lg-15,200,(Lg*2)+20,50,3,Msg);
    ;	
-	push	offset MGRP:s@+47
+	push	si
 	push	3
 	push	50
-	mov	ax,si
+	mov	ax,di
 	shl	ax,1
 	add	ax,20
 	push	ax
 	push	200
 	mov	ax,320
-	sub	ax,si
+	sub	ax,di
 	sub	ax,15
 	push	ax
 	call	near ptr MGRP:_CreateWindow
@@ -9470,10 +9998,10 @@ _MessageBox	proc	near
    ;	
    ;	 OutTextXY ( 320 - Lg,220,Msg);
    ;	
-	push	di
+	push	si
 	push	220
 	mov	ax,320
-	sub	ax,si
+	sub	ax,di
 	push	ax
 	call	near ptr MGRP:_OutTextXY
 	add	sp,6
@@ -9512,9 +10040,9 @@ _mouse_handler	proc	near
    ;	 if (mouse_status)
    ;	
 	cmp	word ptr MGRP:mouse_status,0
-	jne short	@@16
-	jmp	@81@422
-@@16:
+	jne short	@@20
+	jmp	@84@422
+@@20:
    ;	
    ;	 {
    ;	
@@ -9530,14 +10058,14 @@ _mouse_handler	proc	near
    ;	  for (i=0 ; i <= 27 ; i++)
    ;	
 	mov	word ptr MGRP:i,0
-	jmp	short @81@254
-@81@170:
+	jmp	short @84@254
+@84@170:
    ;	
    ;	  {
    ;	    if (flag) setpix ( oldx + cursor [i][0] , oldy + cursor [i][1] , swap[i]);
    ;	
 	cmp	word ptr MGRP:flag,0
-	je	short @81@226
+	je	short @84@226
 	mov	bx,word ptr MGRP:i
 	mov	al,byte ptr MGRP:swap[bx]
 	push	ax
@@ -9556,18 +10084,18 @@ _mouse_handler	proc	near
 	push	dx
 	call	near ptr MGRP:_setpix
 	add	sp,6
-@81@226:
+@84@226:
 	inc	word ptr MGRP:i
-@81@254:
+@84@254:
 	cmp	word ptr MGRP:i,27
-	jle	short @81@170
+	jle	short @84@170
    ;	
    ;	  }
    ;	  for (i=0 ; i <= 27 ; i++)
    ;	
 	mov	word ptr MGRP:i,0
-	jmp	short @81@366
-@81@310:
+	jmp	short @84@366
+@84@310:
    ;	
    ;	  {
    ;	     swap [i] = getpix ( mx + cursor [i][0] , my + cursor [i][1] );
@@ -9613,9 +10141,9 @@ _mouse_handler	proc	near
 	call	near ptr MGRP:_setpix
 	add	sp,6
 	inc	word ptr MGRP:i
-@81@366:
+@84@366:
 	cmp	word ptr MGRP:i,27
-	jle	short @81@310
+	jle	short @84@310
    ;	
    ;	  }
    ;	
@@ -9632,7 +10160,7 @@ _mouse_handler	proc	near
    ;	
 	mov	ax,word ptr MGRP:my
 	mov	word ptr MGRP:oldy,ax
-@81@422:
+@84@422:
    ;	
    ;	 }
    ;	 asm { pop ds dx cx bx ax };
@@ -9686,9 +10214,9 @@ _showmouse	proc	near
    ;	
 	call	near ptr MGRP:_ismouse
 	cmp	ax,00000FFFFh
-	je short	@@17
-	jmp	@83@226
-@@17:
+	je short	@@21
+	jmp	@86@226
+@@21:
    ;	
    ;	
    ;	 mx = oldx; my = oldy;
@@ -9702,8 +10230,8 @@ _showmouse	proc	near
    ;	  for (i=0 ; i <= 27 ; i++)
    ;	
 	xor	si,si
-	jmp	short @83@170
-@83@86:
+	jmp	short @86@170
+@86@86:
    ;	
    ;	  {
    ;	     swap [i] = getpix ( mx + cursor [i][0] , my + cursor [i][1] );
@@ -9729,7 +10257,7 @@ _showmouse	proc	near
    ;	     if (flag) setpix ( mx + cursor [i][0] , my + cursor [i][1] , cursor [i][2]);
    ;	
 	cmp	word ptr MGRP:flag,0
-	je	short @83@142
+	je	short @86@142
 	mov	bx,si
 	imul	bx,bx,3
 	mov	al,byte ptr MGRP:cursor[bx+2]
@@ -9750,18 +10278,18 @@ _showmouse	proc	near
 	push	dx
 	call	near ptr MGRP:_setpix
 	add	sp,6
-@83@142:
+@86@142:
 	inc	si
-@83@170:
+@86@170:
 	cmp	si,27
-	jle	short @83@86
+	jle	short @86@86
    ;	
    ;	  }
    ;	
    ;	 mouse_status = 1;
    ;	
 	mov	word ptr MGRP:mouse_status,1
-@83@226:
+@86@226:
    ;	
    ;	// show_mouse = 1;
    ;	}
@@ -9783,20 +10311,20 @@ _hidemouse	proc	near
    ;	
 	call	near ptr MGRP:_ismouse
 	cmp	ax,00000FFFFh
-	jne	short @84@226
+	jne	short @87@226
    ;	
    ;	
    ;	  for (i=0 ; i <= 27 ; i++)
    ;	
 	xor	si,si
-	jmp	short @84@170
-@84@86:
+	jmp	short @87@170
+@87@86:
    ;	
    ;	  {
    ;	    if (flag) setpix ( oldx + cursor [i][0] , oldy + cursor [i][1] , swap[i]);
    ;	
 	cmp	word ptr MGRP:flag,0
-	je	short @84@142
+	je	short @87@142
 	mov	al,byte ptr MGRP:swap[si]
 	push	ax
 	mov	bx,si
@@ -9815,11 +10343,11 @@ _hidemouse	proc	near
 	push	dx
 	call	near ptr MGRP:_setpix
 	add	sp,6
-@84@142:
+@87@142:
 	inc	si
-@84@170:
+@87@170:
 	cmp	si,27
-	jle	short @84@86
+	jle	short @87@86
    ;	
    ;	  }
    ;	 mouse_status = 0;
@@ -9829,7 +10357,7 @@ _hidemouse	proc	near
    ;	 flag = 0;
    ;	
 	mov	word ptr MGRP:flag,0
-@84@226:
+@87@226:
    ;	
    ;	// show_mouse = 0;
    ;	}
@@ -10121,8 +10649,8 @@ _ShowIcon	proc	near
    ;	 for (i=0; i<=511; i++)
    ;	
 	mov	word ptr [bp-2],0
-	jmp	short @90@254
-@90@58:
+	jmp	short @93@254
+@93@58:
    ;	
    ;	 {
    ;	   IcoColor = (*IcoPix) [126+i];
@@ -10145,7 +10673,7 @@ _ShowIcon	proc	near
 	pop	cx
 	cbw	
 	or	ax,ax
-	jne	short @90@114
+	jne	short @93@114
 	mov	al,byte ptr [bp-5]
 	mov	ah,0
 	sar	ax,4
@@ -10156,7 +10684,7 @@ _ShowIcon	proc	near
 	push	si
 	call	near ptr MGRP:_setpix
 	add	sp,6
-@90@114:
+@93@114:
    ;	
    ;	   x++;
    ;	
@@ -10171,7 +10699,7 @@ _ShowIcon	proc	near
 	pop	cx
 	cbw	
 	or	ax,ax
-	jne	short @90@170
+	jne	short @93@170
 	mov	al,byte ptr [bp-5]
 	mov	ah,0
 	and	ax,15
@@ -10182,7 +10710,7 @@ _ShowIcon	proc	near
 	push	si
 	call	near ptr MGRP:_setpix
 	add	sp,6
-@90@170:
+@93@170:
    ;	
    ;	   x++;
    ;	
@@ -10194,7 +10722,7 @@ _ShowIcon	proc	near
 	mov	ax,word ptr [bp-4]
 	add	ax,32
 	cmp	ax,si
-	jne	short @90@226
+	jne	short @93@226
    ;	
    ;	   {
    ;	    y--;
@@ -10204,11 +10732,11 @@ _ShowIcon	proc	near
    ;	    x = j;
    ;	
 	mov	si,word ptr [bp-4]
-@90@226:
+@93@226:
 	inc	word ptr [bp-2]
-@90@254:
+@93@254:
 	cmp	word ptr [bp-2],511
-	jbe	short @90@58
+	jbe	short @93@58
    ;	
    ;	   }
    ;	 }
@@ -10298,15 +10826,15 @@ _pic	proc	near
    ;	 if (gmode == 1) picx = 160;
    ;	
 	cmp	byte ptr MGRP:_gmode,1
-	jne	short @92@86
+	jne	short @95@86
 	mov	si,160
-	jmp	short @92@114
-@92@86:
+	jmp	short @95@114
+@95@86:
    ;	
    ;	 else picx = 240 ;
    ;	
 	mov	si,240
-@92@114:
+@95@114:
    ;	
    ;	 picy = h+200;   
    ;	
@@ -10333,9 +10861,9 @@ _pic	proc	near
    ;	 if (stream < 2) return;
    ;	
 	cmp	dword ptr [bp-4],large 2
-	jae short	@@18
-	jmp	@92@534
-@@18:
+	jae short	@@22
+	jmp	@95@534
+@@22:
    ;	
    ;	 fread (stream,8062,0,mpic);
    ;	
@@ -10349,15 +10877,15 @@ _pic	proc	near
    ;	 for (pici=0;pici<=(8000-1);pici++)
    ;	
 	mov	word ptr [bp-6],0
-	jmp	short @92@478
-@92@170:
+	jmp	short @95@478
+@95@170:
    ;	
    ;	 {
    ;	  for (picj=0;picj<=7;picj++)
    ;	
 	mov	byte ptr [bp-7],0
-	jmp	short @92@422
-@92@198:
+	jmp	short @95@422
+@95@198:
    ;	
    ;	   {
    ;	    pixel = (pic_peek(pici+62) & (128>>picj));
@@ -10377,13 +10905,13 @@ _pic	proc	near
    ;	
 	mov	ah,0
 	or	ax,ax
-	jne	short @92@254
+	jne	short @95@254
 	push	7
 	push	di
 	push	si
 	call	near ptr MGRP:_setpix
 	add	sp,6
-@92@254:
+@95@254:
    ;	
    ;	    picx++;
    ;	
@@ -10392,34 +10920,34 @@ _pic	proc	near
    ;	    if (gmode == 1)
    ;	
 	cmp	byte ptr MGRP:_gmode,1
-	jne	short @92@338
+	jne	short @95@338
    ;	
    ;	    {
    ;	     if (picx==480) { picy--;picx=160;}
    ;	
 	cmp	si,480
-	jne	short @92@394
+	jne	short @95@394
 	dec	di
 	mov	si,160
-	jmp	short @92@394
-@92@338:
+	jmp	short @95@394
+@95@338:
    ;	
    ;	    }
    ;	    else if (picx == 560) { picy--;picx=240; }
    ;	
 	cmp	si,560
-	jne	short @92@394
+	jne	short @95@394
 	dec	di
 	mov	si,240
-@92@394:
+@95@394:
 	inc	byte ptr [bp-7]
-@92@422:
+@95@422:
 	cmp	byte ptr [bp-7],7
-	jle	short @92@198
+	jle	short @95@198
 	inc	word ptr [bp-6]
-@92@478:
+@95@478:
 	cmp	word ptr [bp-6],7999
-	jbe	short @92@170
+	jbe	short @95@170
    ;	
    ;	   }
    ;	  }
@@ -10428,7 +10956,7 @@ _pic	proc	near
 	push	word ptr MGRP:mpic
 	call	near ptr MGRP:_free
 	pop	cx
-@92@534:
+@95@534:
    ;	
    ;	}
    ;	
@@ -10446,7 +10974,7 @@ _ShowMem	proc	near
    ;	{
    ;	 CreateWindow (120,120,290,105,3,"Memory Usage");
    ;	
-	push	offset MGRP:s@+55
+	push	offset MGRP:s@+33
 	push	3
 	push	large 000690122h
 	push	large 000780078h
@@ -10466,14 +10994,14 @@ _ShowMem	proc	near
    ;	
    ;	 OutTextXY (145,147+2-2,"Real Memory");
    ;	
-	push	offset MGRP:s@+68
+	push	offset MGRP:s@+46
 	push	large 000930091h
 	call	near ptr MGRP:_OutTextXY
 	add	sp,6
    ;	
    ;	 OutTextXY (145,181+2-2,"High Memory");
    ;	
-	push	offset MGRP:s@+80
+	push	offset MGRP:s@+58
 	push	large 000B50091h
 	call	near ptr MGRP:_OutTextXY
 	add	sp,6
@@ -10532,14 +11060,18 @@ _ShowMem	proc	near
 	call	near ptr MGRP:_SetColor
 	pop	cx
    ;	
-   ;	 Bar (146,161,146+ ( (260 * avail()) / 0x7000 ),174);
+   ;	 Bar (146,161,146+ ( (260 * (avail()<<4)) / 0x70000 ),174);
    ;	
 	push	174
 	call	near ptr MGRP:_avail
-	imul	ax,ax,260
-	mov	bx,28672
-	xor	dx,dx
-	div	bx
+	push	dx
+	push	ax
+	pop	eax
+	shl	eax,4
+	imul	eax,large 260
+	mov	ebx,large 000070000h
+	xor	edx,edx
+	div	ebx
 	add	ax,146
 	push	ax
 	push	large 000A10092h
@@ -10732,8 +11264,8 @@ _popup	proc	near
    ;	 for (i=0; i< (argc-1); i++)
    ;	
 	mov	word ptr [bp-2],0
-	jmp	short @94@114
-@94@58:
+	jmp	short @97@114
+@97@58:
    ;	
    ;	 {
    ;	  Line (x+1,y+17+(i*16),x+w-1,y+17+(i*16));
@@ -10796,19 +11328,19 @@ _popup	proc	near
 	call	near ptr MGRP:_SetColor
 	pop	cx
 	inc	word ptr [bp-2]
-@94@114:
+@97@114:
 	mov	ax,word ptr [bp+4]
 	dec	ax
 	cmp	ax,word ptr [bp-2]
-	jg	short @94@58
+	jg	short @97@58
    ;	
    ;	 }
    ;	
    ;	 for (i=0; i<argc; i++)
    ;	
 	mov	word ptr [bp-2],0
-	jmp	@94@366
-@94@170:
+	jmp	@97@366
+@97@170:
    ;	
    ;	  if (argv[i][0] == '#') { SetColor (8);
    ;	
@@ -10818,7 +11350,7 @@ _popup	proc	near
 	add	bx,ax
 	les	bx,dword ptr [bx]
 	cmp	byte ptr es:[bx],35
-	jne	short @94@254
+	jne	short @97@254
 	push	8
 	call	near ptr MGRP:_SetColor
 	pop	cx
@@ -10843,7 +11375,7 @@ _popup	proc	near
 	add	ax,4
 	push	ax
 	call	near ptr MGRP:_FarOutTextXY
-@94@226:
+@97@226:
 	add	sp,8
    ;	
    ;				   SetColor (0);
@@ -10854,8 +11386,8 @@ _popup	proc	near
    ;	
    ;				 }
    ;	
-	jmp	@94@338
-@94@254:
+	jmp	@97@338
+@97@254:
    ;	
    ;	  else if (argv[i][0] == '-' ) {
    ;	
@@ -10865,7 +11397,7 @@ _popup	proc	near
 	add	bx,ax
 	les	bx,dword ptr [bx]
 	cmp	byte ptr es:[bx],45
-	jne	short @94@310
+	jne	short @97@310
    ;	
    ;				    SetColor (8);
    ;	
@@ -10921,8 +11453,8 @@ _popup	proc	near
 	push	dx
 	push	si
 	call	near ptr MGRP:_Line
-	jmp	@94@226
-@94@310:
+	jmp	@97@226
+@97@310:
    ;	
    ;				    SetColor (0);
    ;				  }
@@ -10944,14 +11476,14 @@ _popup	proc	near
 	push	ax
 	call	near ptr MGRP:_FarOutTextXY
 	add	sp,8
-@94@338:
+@97@338:
 	inc	word ptr [bp-2]
-@94@366:
+@97@366:
 	mov	ax,word ptr [bp-2]
 	cmp	ax,word ptr [bp+4]
-	jge short	@@19
-	jmp	@94@170
-@@19:
+	jge short	@@23
+	jmp	@97@170
+@@23:
    ;	
    ;	 SetColor (0);
    ;	
@@ -11026,8 +11558,8 @@ _popup	proc	near
    ;	
 	mov	word ptr [bp-4],0
 	mov	byte ptr [bp-5],72
-	jmp	@94@1710
-@94@422:
+	jmp	@97@1710
+@97@422:
    ;	
    ;	 showmouse ();
    ;	 while ( (k == 72) || (k==80) )
@@ -11036,47 +11568,47 @@ _popup	proc	near
    ;	
 	call	near ptr MGRP:_bmouse
 	cmp	ax,1
-	je short	@@20
-	jmp	@94@1066
-@@20:
+	je short	@@24
+	jmp	@97@1066
+@@24:
 	cmp	word ptr MGRP:mouse_status,0
-	jne short	@@21
-	jmp	@94@1066
-@@21:
+	jne short	@@25
+	jmp	@97@1066
+@@25:
    ;	
    ;	   {
    ;	     if ( (mx > x) && (my > y) && (mx < x+w) && (my < (y+(argc*16)+2) ) )
    ;	
 	cmp	word ptr MGRP:mx,si
-	jg short	@@22
-	jmp	@94@1794
-@@22:
+	jg short	@@26
+	jmp	@97@1794
+@@26:
 	cmp	word ptr MGRP:my,di
-	jg short	@@23
-	jmp	@94@1794
-@@23:
+	jg short	@@27
+	jmp	@97@1794
+@@27:
 	mov	ax,si
 	add	ax,word ptr [bp+12]
 	cmp	ax,word ptr MGRP:mx
-	jg short	@@24
-	jmp	@94@1794
-@@24:
+	jg short	@@28
+	jmp	@97@1794
+@@28:
 	mov	ax,word ptr [bp+4]
 	shl	ax,4
 	mov	dx,di
 	add	dx,ax
 	add	dx,2
 	cmp	dx,word ptr MGRP:my
-	jg short	@@25
-	jmp	@94@1794
-@@25:
+	jg short	@@29
+	jmp	@97@1794
+@@29:
    ;	
    ;	     {
    ;	      for (i=0; i<argc; i++)
    ;	
 	mov	word ptr [bp-2],0
-	jmp	@94@1038
-@94@618:
+	jmp	@97@1038
+@97@618:
    ;	
    ;	      if (  (my > (y+(i*16)+1)) && (my < (y+(i*16)+16) ) )
    ;	
@@ -11086,18 +11618,18 @@ _popup	proc	near
 	add	dx,ax
 	inc	dx
 	cmp	dx,word ptr MGRP:my
-	jl short	@@26
-	jmp	@94@1010
-@@26:
+	jl short	@@30
+	jmp	@97@1010
+@@30:
 	mov	ax,word ptr [bp-2]
 	shl	ax,4
 	mov	dx,di
 	add	dx,ax
 	add	dx,16
 	cmp	dx,word ptr MGRP:my
-	jg short	@@27
-	jmp	@94@1010
-@@27:
+	jg short	@@31
+	jmp	@97@1010
+@@31:
    ;	
    ;	      {
    ;	       if ( (argv[i][0] != '#') && (argv[i][0] != '-') )
@@ -11108,18 +11640,18 @@ _popup	proc	near
 	add	bx,ax
 	les	bx,dword ptr [bx]
 	cmp	byte ptr es:[bx],35
-	jne short	@@28
-	jmp	@94@1010
-@@28:
+	jne short	@@32
+	jmp	@97@1010
+@@32:
 	mov	ax,word ptr [bp-2]
 	shl	ax,2
 	mov	bx,word ptr [bp+6]
 	add	bx,ax
 	mov	bx,word ptr [bx]
 	cmp	byte ptr es:[bx],45
-	jne short	@@29
-	jmp	@94@1010
-@@29:
+	jne short	@@33
+	jmp	@97@1010
+@@33:
    ;	
    ;	       {
    ;		k = 28;
@@ -11174,7 +11706,7 @@ _popup	proc	near
 	add	bx,ax
 	les	bx,dword ptr [bx]
 	cmp	byte ptr es:[bx],35
-	jne	short @94@786
+	jne	short @97@786
 	push	8
 	call	near ptr MGRP:_SetColor
 	pop	cx
@@ -11189,8 +11721,8 @@ _popup	proc	near
 	inc	ax
 	push	word ptr [bx+2]
 	push	ax
-	jmp	short @94@814
-@94@786:
+	jmp	short @97@814
+@97@786:
    ;	
    ;			   else FarOutTextXY (x+4,y+2+(j*16),argv[j]);
    ;	
@@ -11199,7 +11731,7 @@ _popup	proc	near
 	mov	bx,word ptr [bp+6]
 	add	bx,ax
 	push	dword ptr [bx]
-@94@814:
+@97@814:
 	mov	ax,word ptr [bp-4]
 	shl	ax,4
 	mov	dx,di
@@ -11293,7 +11825,7 @@ _popup	proc	near
 	add	bx,ax
 	les	bx,dword ptr [bx]
 	cmp	byte ptr es:[bx],35
-	jne	short @94@926
+	jne	short @97@926
 	push	8
 	call	near ptr MGRP:_SetColor
 	pop	cx
@@ -11308,7 +11840,7 @@ _popup	proc	near
 	inc	ax
 	push	word ptr [bx+2]
 	push	ax
-@94@898:
+@97@898:
 	mov	ax,word ptr [bp-4]
 	shl	ax,4
 	mov	dx,di
@@ -11320,8 +11852,8 @@ _popup	proc	near
 	push	ax
 	call	near ptr MGRP:_FarOutTextXY
 	add	sp,8
-	jmp	short @94@954
-@94@926:
+	jmp	short @97@954
+@97@926:
    ;	
    ;			   else FarOutTextXY (x+4,y+2+(j*16),argv[j]);
    ;	
@@ -11330,14 +11862,14 @@ _popup	proc	near
 	mov	bx,word ptr [bp+6]
 	add	bx,ax
 	push	dword ptr [bx]
-	jmp	short @94@898
-@94@954:
+	jmp	short @97@898
+@97@954:
    ;	
    ;		 while ( bmouse () == 1);
    ;	
 	call	near ptr MGRP:_bmouse
 	cmp	ax,1
-	je	short @94@954
+	je	short @97@954
    ;	
    ;			   hidemouse ();
    ;	
@@ -11346,15 +11878,15 @@ _popup	proc	near
    ;			   showmouse ();
    ;	
 	call	near ptr MGRP:_showmouse
-@94@1010:
+@97@1010:
 	inc	word ptr [bp-2]
-@94@1038:
+@97@1038:
 	mov	ax,word ptr [bp-2]
 	cmp	ax,word ptr [bp+4]
-	jge short	@@30
-	jmp	@94@618
-@@30:
-@94@1066:
+	jge short	@@34
+	jmp	@97@618
+@@34:
+@97@1066:
    ;	
    ;	       }
    ;	      }
@@ -11367,9 +11899,9 @@ _popup	proc	near
    ;	
 	call	near ptr MGRP:_is_key
 	or	al,al
-	jne short	@@31
-	jmp	@94@1738
-@@31:
+	jne short	@@35
+	jmp	@97@1738
+@@35:
    ;	
    ;	   {
    ;	    k = getch ();
@@ -11380,12 +11912,12 @@ _popup	proc	near
    ;	    if ( (k==72) || (k==80) )
    ;	
 	cmp	byte ptr [bp-5],72
-	je	short @94@1150
+	je	short @97@1150
 	cmp	byte ptr [bp-5],80
-	je short	@@32
-	jmp	@94@1738
-@@32:
-@94@1150:
+	je short	@@36
+	jmp	@97@1738
+@@36:
+@97@1150:
    ;	
    ;	    {
    ;			   SetColor (7);
@@ -11436,7 +11968,7 @@ _popup	proc	near
 	add	bx,ax
 	les	bx,dword ptr [bx]
 	cmp	byte ptr es:[bx],35
-	jne	short @94@1206
+	jne	short @97@1206
 	push	8
 	call	near ptr MGRP:_SetColor
 	pop	cx
@@ -11451,8 +11983,8 @@ _popup	proc	near
 	inc	ax
 	push	word ptr [bx+2]
 	push	ax
-	jmp	short @94@1234
-@94@1206:
+	jmp	short @97@1234
+@97@1206:
    ;	
    ;			   else FarOutTextXY (x+4,y+2+(j*16),argv[j]);
    ;	
@@ -11461,7 +11993,7 @@ _popup	proc	near
 	mov	bx,word ptr [bp+6]
 	add	bx,ax
 	push	dword ptr [bx]
-@94@1234:
+@97@1234:
 	mov	ax,word ptr [bp-4]
 	shl	ax,4
 	mov	dx,di
@@ -11477,22 +12009,22 @@ _popup	proc	near
    ;	     if ( k == 72 ) {
    ;	
 	cmp	byte ptr [bp-5],72
-	jne	short @94@1430
+	jne	short @97@1430
    ;	
    ;			    if (!j) j = (argc - 1);
    ;	
 	cmp	word ptr [bp-4],0
-	jne	short @94@1346
+	jne	short @97@1346
 	mov	ax,word ptr [bp+4]
 	dec	ax
 	mov	word ptr [bp-4],ax
-	jmp	short @94@1374
-@94@1346:
+	jmp	short @97@1374
+@97@1346:
    ;	
    ;			    else j--;
    ;	
 	dec	word ptr [bp-4]
-@94@1374:
+@97@1374:
    ;	
    ;			    if (argv[j][0] == '-') j--;
    ;	
@@ -11502,30 +12034,30 @@ _popup	proc	near
 	add	bx,ax
 	les	bx,dword ptr [bx]
 	cmp	byte ptr es:[bx],45
-	jne	short @94@1430
+	jne	short @97@1430
 	dec	word ptr [bp-4]
-@94@1430:
+@97@1430:
    ;	
    ;			  }
    ;	     if ( k == 80 ) {
    ;	
 	cmp	byte ptr [bp-5],80
-	jne	short @94@1598
+	jne	short @97@1598
    ;	
    ;			   if (j == (argc-1) ) j = 0;
    ;	
 	mov	ax,word ptr [bp+4]
 	dec	ax
 	cmp	ax,word ptr [bp-4]
-	jne	short @94@1514
+	jne	short @97@1514
 	mov	word ptr [bp-4],0
-	jmp	short @94@1542
-@94@1514:
+	jmp	short @97@1542
+@97@1514:
    ;	
    ;			   else j++;
    ;	
 	inc	word ptr [bp-4]
-@94@1542:
+@97@1542:
    ;	
    ;			    if (argv[j][0] == '-') j++;
    ;	
@@ -11535,9 +12067,9 @@ _popup	proc	near
 	add	bx,ax
 	les	bx,dword ptr [bx]
 	cmp	byte ptr es:[bx],45
-	jne	short @94@1598
+	jne	short @97@1598
 	inc	word ptr [bp-4]
-@94@1598:
+@97@1598:
    ;	
    ;			  }
    ;			   SetColor (0);
@@ -11616,7 +12148,7 @@ _popup	proc	near
 	add	bx,ax
 	les	bx,dword ptr [bx]
 	cmp	byte ptr es:[bx],35
-	jne	short @94@1654
+	jne	short @97@1654
 	push	8
 	call	near ptr MGRP:_SetColor
 	pop	cx
@@ -11631,8 +12163,8 @@ _popup	proc	near
 	inc	ax
 	push	word ptr [bx+2]
 	push	ax
-	jmp	short @94@1682
-@94@1654:
+	jmp	short @97@1682
+@97@1654:
    ;	
    ;			   else FarOutTextXY (x+4,y+2+(j*16),argv[j]);
    ;	
@@ -11641,7 +12173,7 @@ _popup	proc	near
 	mov	bx,word ptr [bp+6]
 	add	bx,ax
 	push	dword ptr [bx]
-@94@1682:
+@97@1682:
 	mov	ax,word ptr [bp-4]
 	shl	ax,4
 	mov	dx,di
@@ -11653,21 +12185,21 @@ _popup	proc	near
 	push	ax
 	call	near ptr MGRP:_FarOutTextXY
 	add	sp,8
-@94@1710:
+@97@1710:
    ;	
    ;			   showmouse ();
    ;	
 	call	near ptr MGRP:_showmouse
-@94@1738:
+@97@1738:
 	cmp	byte ptr [bp-5],72
-	jne short	@@33
-	jmp	@94@422
-@@33:
+	jne short	@@37
+	jmp	@97@422
+@@37:
 	cmp	byte ptr [bp-5],80
-	jne short	@@34
-	jmp	@94@422
-@@34:
-@94@1794:
+	jne short	@@38
+	jmp	@97@422
+@@38:
+@97@1794:
    ;	
    ;	    }
    ;	   }
@@ -11705,16 +12237,16 @@ _popup	proc	near
    ;	 if (k == 28) return (j+1);
    ;	
 	cmp	byte ptr [bp-5],28
-	jne	short @94@1850
+	jne	short @97@1850
 	mov	ax,word ptr [bp-4]
 	inc	ax
-	jmp	short @94@1878
-@94@1850:
+	jmp	short @97@1878
+@97@1850:
    ;	
    ;	 else return 0;
    ;	
 	xor	ax,ax
-@94@1878:
+@97@1878:
    ;	
    ;	}
    ;	
@@ -11774,8 +12306,8 @@ _DispText	proc	near
    ;	
 	mov	ax,word ptr [bp+4]
 	mov	word ptr [bp-2],ax
-	jmp	@96@786
-@96@58:
+	jmp	@99@786
+@99@58:
    ;	
    ;	 {
    ;	
@@ -11784,20 +12316,20 @@ _DispText	proc	near
 	les	bx,dword ptr MGRP:_FarTABuffer
 	add	bx,word ptr [bp-2]
 	cmp	byte ptr es:[bx],13
-	je short	@@35
-	jmp	@96@478
-@@35:
+	je short	@@39
+	jmp	@99@478
+@@39:
    ;	
    ;	  {
    ;	   if ( (update == 2) )
    ;	
 	cmp	byte ptr [bp+20],2
-	jne	short @96@198
+	jne	short @99@198
    ;	
    ;	   {
    ;	    SetColor (COLOR_B);
    ;	
-	push	0
+	push	15
 	call	near ptr MGRP:_SetColor
 	pop	cx
    ;	
@@ -11817,20 +12349,20 @@ _DispText	proc	near
    ;	    if ( (oldY == Y) && (!cr) && (X < (x+w-9-8)) )
    ;	
 	cmp	word ptr [bp-4],si
-	jne	short @96@198
+	jne	short @99@198
 	mov	al,byte ptr [bp+22]
 	cbw	
 	or	ax,ax
-	jne	short @96@198
+	jne	short @99@198
 	mov	ax,word ptr [bp+6]
 	add	ax,word ptr [bp+10]
 	sub	ax,9
 	sub	ax,8
 	cmp	ax,di
-	jbe short	@@36
-	jmp	@96@814
-@@36:
-@96@198:
+	jbe short	@@40
+	jmp	@99@814
+@@40:
+@99@198:
    ;	
    ;	    {
    ;	     break;
@@ -11840,33 +12372,33 @@ _DispText	proc	near
    ;	   if ( (update==1) && (oldY == Y) ) break;
    ;	
 	cmp	byte ptr [bp+20],1
-	jne	short @96@254
+	jne	short @99@254
 	cmp	word ptr [bp-4],si
-	jne short	@@37
-	jmp	@96@814
-@@37:
-@96@254:
+	jne short	@@41
+	jmp	@99@814
+@@41:
+@99@254:
    ;	
    ;	   else if ( (update==1)  && (X != x+5)) break;
    ;	
 	cmp	byte ptr [bp+20],1
-	jne	short @96@310
+	jne	short @99@310
 	mov	ax,word ptr [bp+6]
 	add	ax,5
 	cmp	ax,di
-	je short	@@38
-	jmp	@96@814
-@@38:
-@96@310:
+	je short	@@42
+	jmp	@99@814
+@@42:
+@99@310:
    ;	
    ;	   else if ( (update ==1) && (X==x+5) )
    ;	
 	cmp	byte ptr [bp+20],1
-	jne	short @96@394
+	jne	short @99@394
 	mov	ax,word ptr [bp+6]
 	add	ax,5
 	cmp	ax,di
-	jne	short @96@394
+	jne	short @99@394
    ;	
    ;	   {
    ;	    scroll_down (x,Y,w,h-(Y-y)-18,16);
@@ -11886,18 +12418,18 @@ _DispText	proc	near
    ;	
    ;	    SetColor (COLOR_B);
    ;	
-	push	0
+	push	15
 	call	near ptr MGRP:_SetColor
 	pop	cx
    ;	
-   ;	    Bar (x+1,Y,x+w-1,Y+16);
+   ;	    Bar (x+1,Y,x+w-3,Y+16);
    ;	
 	mov	ax,si
 	add	ax,16
 	push	ax
 	mov	ax,word ptr [bp+6]
 	add	ax,word ptr [bp+10]
-	dec	ax
+	sub	ax,3
 	push	ax
 	push	si
 	mov	ax,word ptr [bp+6]
@@ -11908,8 +12440,8 @@ _DispText	proc	near
    ;	
    ;	    break;
    ;	
-	jmp	@96@814
-@96@394:
+	jmp	@99@814
+@99@394:
    ;	
    ;	   }
    ;	   else
@@ -11917,37 +12449,37 @@ _DispText	proc	near
    ;	    if (update)
    ;	
 	cmp	byte ptr [bp+20],0
-	je	short @96@450
+	je	short @99@450
    ;	
    ;	    {
    ;	     SetColor (COLOR_B);
    ;	
-	push	0
+	push	15
 	call	near ptr MGRP:_SetColor
 	pop	cx
    ;	
-   ;	     Bar (X,Y,x+w-1,Y+16);
+   ;	     Bar (X,Y,x+w-3,Y+16);
    ;	
 	mov	ax,si
 	add	ax,16
 	push	ax
 	mov	ax,word ptr [bp+6]
 	add	ax,word ptr [bp+10]
-	dec	ax
+	sub	ax,3
 	push	ax
 	push	si
 	push	di
 	call	near ptr MGRP:_Bar
 	add	sp,8
-@96@450:
+@99@450:
    ;	
    ;	    }
    ;	    X = x+5;
    ;	
 	mov	di,word ptr [bp+6]
 	add	di,5
-	jmp	short @96@674
-@96@478:
+	jmp	@99@674
+@99@478:
    ;	
    ;	   }
    ;	  }
@@ -11956,7 +12488,7 @@ _DispText	proc	near
 	les	bx,dword ptr MGRP:_FarTABuffer
 	add	bx,word ptr [bp-2]
 	cmp	byte ptr es:[bx],10
-	jne	short @96@534
+	jne	short @99@534
    ;	
    ;	  {
    ;	   Y = Y + 16;
@@ -11965,26 +12497,26 @@ _DispText	proc	near
    ;	
    ;	  }
    ;	
-	jmp	short @96@674
-@96@534:
+	jmp	short @99@674
+@99@534:
    ;	
    ;	  else if (FarTABuffer [i] == 0)
    ;	
 	les	bx,dword ptr MGRP:_FarTABuffer
 	add	bx,word ptr [bp-2]
 	cmp	byte ptr es:[bx],0
-	jne	short @96@590
+	jne	short @99@590
    ;	
    ;	  {
    ;	   //if (X == x+5)
-   ;	    Bar (X,Y,x+w-1,Y+16);
+   ;	    Bar (X,Y,x+w-3,Y+16);
    ;	
 	mov	ax,si
 	add	ax,16
 	push	ax
 	mov	ax,word ptr [bp+6]
 	add	ax,word ptr [bp+10]
-	dec	ax
+	sub	ax,3
 	push	ax
 	push	si
 	push	di
@@ -12000,8 +12532,8 @@ _DispText	proc	near
    ;	
    ;	   break;
    ;	
-	jmp	short @96@814
-@96@590:
+	jmp	short @99@814
+@99@590:
    ;	
    ;	  }
    ;	  else
@@ -12009,12 +12541,12 @@ _DispText	proc	near
    ;	   if (update)
    ;	
 	cmp	byte ptr [bp+20],0
-	je	short @96@646
+	je	short @99@646
    ;	
    ;	   {
    ;	    SetColor (COLOR_B);
    ;	
-	push	0
+	push	15
 	call	near ptr MGRP:_SetColor
 	pop	cx
    ;	
@@ -12030,14 +12562,14 @@ _DispText	proc	near
 	push	di
 	call	near ptr MGRP:_Bar
 	add	sp,8
-@96@646:
+@99@646:
    ;	
    ;	   }
    ;	   PrintChar (FarTABuffer[i],X,Y,COLOR_F,255,0);
    ;	
 	push	0
 	push	255
-	push	15
+	push	0
 	push	si
 	push	di
 	les	bx,dword ptr MGRP:_FarTABuffer
@@ -12050,7 +12582,7 @@ _DispText	proc	near
    ;	   X += 8;
    ;	
 	add	di,8
-@96@674:
+@99@674:
    ;	
    ;	  }
    ;	  if ( X >= (x+w-9) )
@@ -12059,7 +12591,7 @@ _DispText	proc	near
 	add	ax,word ptr [bp+10]
 	sub	ax,9
 	cmp	ax,di
-	ja	short @96@730
+	ja	short @99@730
    ;	
    ;	  {
    ;	   X = x+5;
@@ -12070,7 +12602,7 @@ _DispText	proc	near
    ;	   Y = Y + 16;
    ;	
 	add	si,16
-@96@730:
+@99@730:
    ;	
    ;	  }
    ;	  if ( Y >= (y+5+h-10)) break;
@@ -12080,15 +12612,15 @@ _DispText	proc	near
 	add	ax,5
 	sub	ax,10
 	cmp	ax,si
-	jbe	short @96@814
+	jbe	short @99@814
 	inc	word ptr [bp-2]
-@96@786:
+@99@786:
 	mov	ax,word ptr [bp-2]
 	cmp	ax,word ptr [bp+14]
-	ja short	@@39
-	jmp	@96@58
-@@39:
-@96@814:
+	ja short	@@43
+	jmp	@99@58
+@@43:
+@99@814:
    ;	
    ;	 }
    ;	
@@ -12102,28 +12634,28 @@ _DispText	proc	near
 	add	ax,5
 	sub	ax,10
 	cmp	ax,si
-	jbe	short @96@926
+	jbe	short @99@926
 	cmp	byte ptr [bp+20],2
-	jne	short @96@926
+	jne	short @99@926
 	cmp	si,word ptr [bp-4]
-	je	short @96@926
+	je	short @99@926
    ;	
    ;	 {
    ;	  SetColor (COLOR_B);
    ;	
-	push	0
+	push	15
 	call	near ptr MGRP:_SetColor
 	pop	cx
    ;	
    ;	//  Bar (x+1,Y,x+w-1,y+h-1);
-   ;	  Bar (x+1,Y,x+w-1,Y+16);
+   ;	  Bar (x+1,Y,x+w-3,Y+16);
    ;	
 	mov	ax,si
 	add	ax,16
 	push	ax
 	mov	ax,word ptr [bp+6]
 	add	ax,word ptr [bp+10]
-	dec	ax
+	sub	ax,3
 	push	ax
 	push	si
 	mov	ax,word ptr [bp+6]
@@ -12131,7 +12663,7 @@ _DispText	proc	near
 	push	ax
 	call	near ptr MGRP:_Bar
 	add	sp,8
-@96@926:
+@99@926:
    ;	
    ;	 }
    ;	
@@ -12459,26 +12991,28 @@ _TextArea	proc	near
    ;	 unsigned int oldX,oldY;
    ;	 char cr;
    ;	
+   ;	//w = w - 5;
    ;	
    ;	if (StrOfs == 1234)
    ;	
 	cmp	dx,1234
-	jne	short @100@86
+	jne	short @103@86
    ;	
    ;	{
    ;	 SetColor (COLOR_B);
    ;	
-	push	0
+	push	15
 	call	near ptr MGRP:_SetColor
 	pop	cx
    ;	
-   ;	 fastbar (x,y,x+w,y+h);
+   ;	 fastbar (x,y,x+w-5,y+h);
    ;	
 	mov	ax,word ptr [bp+6]
 	add	ax,word ptr [bp+10]
 	push	ax
 	mov	ax,word ptr [bp+4]
 	add	ax,word ptr [bp+8]
+	sub	ax,5
 	push	ax
 	push	word ptr [bp+6]
 	push	word ptr [bp+4]
@@ -12513,8 +13047,8 @@ _TextArea	proc	near
    ;	
    ;	 return;
    ;	
-	jmp	@100@3054
-@100@86:
+	jmp	@103@3054
+@103@86:
    ;	
    ;	}
    ;	
@@ -12562,8 +13096,8 @@ _TextArea	proc	near
    ;	 keycode = 0;
    ;	
 	mov	byte ptr MGRP:keycode,0
-	jmp	@100@2998
-@100@114:
+	jmp	@103@2998
+@103@114:
    ;	
    ;	
    ;	 while ( keycode != 1 )
@@ -12578,7 +13112,7 @@ _TextArea	proc	near
    ;	
 	push	0
 	push	255
-	push	0
+	push	15
 	mov	ax,word ptr [bp-2]
 	inc	ax
 	push	ax
@@ -12594,18 +13128,18 @@ _TextArea	proc	near
 	cbw	
 	mov	word ptr [bp-14],ax
 	mov	cx,8
-	mov	bx,offset @100@C114
-@100@198:
+	mov	bx,offset @103@C114
+@103@198:
 	mov	ax,word ptr cs:[bx]
 	cmp	ax,word ptr [bp-14]
-	je	short @100@282
+	je	short @103@282
 	add	bx,2
-	loop	short @100@198
-	jmp	@100@2886
-@100@282:
+	loop	short @103@198
+	jmp	@103@2886
+@103@282:
 	jmp	word ptr cs:[bx+16]
-	jmp	@100@2970
-@100@310:
+	jmp	@103@2970
+@103@310:
    ;	
    ;	  {
    ;	   case 1: break;
@@ -12614,9 +13148,9 @@ _TextArea	proc	near
    ;	   if (i == 0) break;
    ;	
 	or	di,di
-	jne short	@@40
-	jmp	@100@2970
-@@40:
+	jne short	@@44
+	jmp	@103@2970
+@@44:
    ;	
    ;	
    ;	    if (X == x+5)
@@ -12624,9 +13158,9 @@ _TextArea	proc	near
 	mov	ax,word ptr [bp+4]
 	add	ax,5
 	cmp	ax,si
-	je short	@@41
-	jmp	@100@1934
-@@41:
+	je short	@@45
+	jmp	@103@1934
+@@45:
    ;	
    ;	    {
    ;	     if ( FarTABuffer [i-1] != 10 )
@@ -12636,9 +13170,9 @@ _TextArea	proc	near
 	les	bx,dword ptr MGRP:_FarTABuffer
 	add	bx,ax
 	cmp	byte ptr es:[bx],10
-	jne short	@@42
-	jmp	@100@590
-@@42:
+	jne short	@@46
+	jmp	@103@590
+@@46:
    ;	
    ;	     {
    ;	      i--;
@@ -12666,9 +13200,9 @@ _TextArea	proc	near
 	add	ax,5
 	sub	ax,16
 	cmp	ax,word ptr [bp-2]
-	je short	@@43
-	jmp	@100@2970
-@@43:
+	je short	@@47
+	jmp	@103@2970
+@@47:
    ;	
    ;	      {
    ;	       scroll_down (x,y+1,w,h-18,16);
@@ -12687,18 +13221,18 @@ _TextArea	proc	near
    ;	
    ;	       SetColor (COLOR_B);
    ;	
-	push	0
+	push	15
 	call	near ptr MGRP:_SetColor
 	pop	cx
    ;	
-   ;	       Bar (x+1,y+5,x+w-1,y+16+5);
+   ;	       Bar (x+1,y+5,x+w-3,y+16+5);
    ;	
 	mov	ax,word ptr [bp+6]
 	add	ax,21
 	push	ax
 	mov	ax,word ptr [bp+4]
 	add	ax,word ptr [bp+8]
-	dec	ax
+	sub	ax,3
 	push	ax
 	mov	ax,word ptr [bp+6]
 	add	ax,5
@@ -12739,14 +13273,14 @@ _TextArea	proc	near
 	mov	dx,di
 	sub	dx,ax
 	mov	word ptr [bp-6],dx
-	jmp	short @100@506
-@100@450:
+	jmp	short @103@506
+@103@450:
    ;	
    ;		PrintChar (FarTABuffer[oldi++],X,Y,COLOR_F,255,0);
    ;	
 	push	0
 	push	255
-	push	15
+	push	0
 	push	word ptr [bp-2]
 	push	si
 	mov	ax,word ptr [bp-6]
@@ -12758,17 +13292,17 @@ _TextArea	proc	near
 	call	near ptr MGRP:_PrintChar
 	add	sp,12
 	add	si,8
-@100@506:
+@103@506:
 	mov	ax,word ptr [bp+4]
 	add	ax,word ptr [bp+8]
 	sub	ax,9
 	cmp	ax,si
-	jbe	short @100@562
+	jbe	short @103@562
 	les	bx,dword ptr MGRP:_FarTABuffer
 	add	bx,word ptr [bp-6]
 	cmp	byte ptr es:[bx],13
-	jne	short @100@450
-@100@562:
+	jne	short @103@450
+@103@562:
    ;	
    ;	       X = x + 5 + ( (w/8) - 2) * 8;
    ;	
@@ -12778,8 +13312,8 @@ _TextArea	proc	near
 	shl	ax,3
 	mov	si,word ptr [bp+4]
 	add	si,ax
-	jmp	@100@2858
-@100@590:
+	jmp	@103@2858
+@103@590:
    ;	
    ;	      }
    ;	
@@ -12789,10 +13323,10 @@ _TextArea	proc	near
    ;	     for ( tad = 0;((FarTABuffer [i-3-tad] != 10) && (i-2-tad != 0)); tad++) ;
    ;	
 	mov	byte ptr [bp-7],0
-	jmp	short @100@646
-@100@618:
+	jmp	short @103@646
+@103@618:
 	inc	byte ptr [bp-7]
-@100@646:
+@103@646:
 	mov	al,byte ptr [bp-7]
 	mov	ah,0
 	mov	dx,di
@@ -12801,15 +13335,15 @@ _TextArea	proc	near
 	les	bx,dword ptr MGRP:_FarTABuffer
 	add	bx,dx
 	cmp	byte ptr es:[bx],10
-	je	short @100@702
+	je	short @103@702
 	mov	al,byte ptr [bp-7]
 	mov	ah,0
 	mov	dx,di
 	sub	dx,2
 	sub	dx,ax
 	or	dx,dx
-	jne	short @100@618
-@100@702:
+	jne	short @103@618
+@103@702:
    ;	
    ;	
    ;	     if ( tad > ((w/8)-2) ) tad = (tad % ((w/8)-1) ) ;
@@ -12820,7 +13354,7 @@ _TextArea	proc	near
 	shr	dx,3
 	sub	dx,2
 	cmp	ax,dx
-	jbe	short @100@758
+	jbe	short @103@758
 	mov	al,byte ptr [bp-7]
 	mov	ah,0
 	mov	dx,word ptr [bp+8]
@@ -12833,7 +13367,7 @@ _TextArea	proc	near
 	pop	ax
 	div	bx
 	mov	byte ptr [bp-7],dl
-@100@758:
+@103@758:
    ;	
    ;		       // =
    ;	     X = x+5+(tad * 8);
@@ -12860,9 +13394,9 @@ _TextArea	proc	near
 	add	ax,5
 	sub	ax,16
 	cmp	ax,word ptr [bp-2]
-	je short	@@44
-	jmp	@100@2970
-@@44:
+	je short	@@48
+	jmp	@103@2970
+@@48:
    ;	
    ;	      {
    ;	      scroll_down (x,y+1,w,h-18,16);
@@ -12881,18 +13415,18 @@ _TextArea	proc	near
    ;	
    ;	      SetColor (COLOR_B);
    ;	
-	push	0
+	push	15
 	call	near ptr MGRP:_SetColor
 	pop	cx
    ;	
-   ;	      Bar (x+1,y+5,x+w-1,y+16+5);
+   ;	      Bar (x+1,y+5,x+w-3,y+16+5);
    ;	
 	mov	ax,word ptr [bp+6]
 	add	ax,21
 	push	ax
 	mov	ax,word ptr [bp+4]
 	add	ax,word ptr [bp+8]
-	dec	ax
+	sub	ax,3
 	push	ax
 	mov	ax,word ptr [bp+6]
 	add	ax,5
@@ -12938,9 +13472,9 @@ _TextArea	proc	near
 	mov	dx,di
 	sub	dx,ax
 	push	dx
-	jmp	@100@2634
-	jmp	@100@1934
-@100@842:
+	jmp	@103@2634
+	jmp	@103@1934
+@103@842:
    ;	
    ;	
    ;	      }
@@ -12961,9 +13495,9 @@ _TextArea	proc	near
 	les	bx,dword ptr MGRP:_FarTABuffer
 	add	bx,di
 	cmp	byte ptr es:[bx],0
-	jne short	@@45
-	jmp	@100@2970
-@@45:
+	jne short	@@49
+	jmp	@103@2970
+@@49:
    ;	
    ;	
    ;	    if ( X >= (x+w-9-8 ) )
@@ -12973,9 +13507,9 @@ _TextArea	proc	near
 	sub	ax,9
 	sub	ax,8
 	cmp	ax,si
-	jbe short	@@46
-	jmp	@100@1066
-@@46:
+	jbe short	@@50
+	jmp	@103@1066
+@@50:
    ;	
    ;	    {
    ;	     X = x+5;
@@ -13005,9 +13539,9 @@ _TextArea	proc	near
 	add	ax,5
 	sub	ax,10
 	cmp	ax,word ptr [bp-2]
-	jbe short	@@47
-	jmp	@100@2970
-@@47:
+	jbe short	@@51
+	jmp	@103@2970
+@@51:
    ;	
    ;	     {
    ;	      scroll_up (x,y+18,w,h-18,16);
@@ -13026,11 +13560,11 @@ _TextArea	proc	near
    ;	
    ;	      SetColor (COLOR_B);
    ;	
-	push	0
+	push	15
 	call	near ptr MGRP:_SetColor
 	pop	cx
    ;	
-   ;	      Bar (x+1,y+h-16,x+w-1,y+h-1);
+   ;	      Bar (x+1,y+h-16,x+w-3,y+h-1);
    ;	
 	mov	ax,word ptr [bp+6]
 	add	ax,word ptr [bp+10]
@@ -13038,7 +13572,7 @@ _TextArea	proc	near
 	push	ax
 	mov	ax,word ptr [bp+4]
 	add	ax,word ptr [bp+8]
-	dec	ax
+	sub	ax,3
 	push	ax
 	mov	ax,word ptr [bp+6]
 	add	ax,word ptr [bp+10]
@@ -13061,7 +13595,7 @@ _TextArea	proc	near
 	mov	ax,word ptr [bp-2]
 	sub	ax,16
 	mov	word ptr [bp-2],ax
-@100@954:
+@103@954:
    ;	
    ;	      while (1)
    ;	      {
@@ -13071,24 +13605,24 @@ _TextArea	proc	near
 	add	ax,word ptr [bp+8]
 	sub	ax,9
 	cmp	ax,si
-	ja short	@@48
-	jmp	@100@1234
-@@48:
+	ja short	@@52
+	jmp	@103@1234
+@@52:
    ;	
    ;	       if (FarTABuffer [i] == 13) break;
    ;	
 	les	bx,dword ptr MGRP:_FarTABuffer
 	add	bx,di
 	cmp	byte ptr es:[bx],13
-	jne short	@@49
-	jmp	@100@1234
-@@49:
+	jne short	@@53
+	jmp	@103@1234
+@@53:
    ;	
    ;	       PrintChar (FarTABuffer[i++],X,Y,COLOR_F,255,0);
    ;	
 	push	0
 	push	255
-	push	15
+	push	0
 	push	word ptr [bp-2]
 	push	si
 	mov	ax,di
@@ -13103,9 +13637,9 @@ _TextArea	proc	near
    ;	       X = X + 8;
    ;	
 	add	si,8
-	jmp	short @100@954
-	jmp	@100@1234
-@100@1066:
+	jmp	short @103@954
+	jmp	@103@1234
+@103@1066:
    ;	
    ;	      }
    ;	      X = x+5;
@@ -13118,9 +13652,9 @@ _TextArea	proc	near
 	les	bx,dword ptr MGRP:_FarTABuffer
 	add	bx,di
 	cmp	byte ptr es:[bx],13
-	je short	@@50
-	jmp	@100@1262
-@@50:
+	je short	@@54
+	jmp	@103@1262
+@@54:
    ;	
    ;	    {
    ;	     X = x+5;
@@ -13149,9 +13683,9 @@ _TextArea	proc	near
 	add	ax,5
 	sub	ax,10
 	cmp	ax,word ptr [bp-2]
-	jbe short	@@51
-	jmp	@100@2970
-@@51:
+	jbe short	@@55
+	jmp	@103@2970
+@@55:
    ;	
    ;	     {
    ;	      scroll_up (x,y+18,w,h-18,16);
@@ -13170,11 +13704,11 @@ _TextArea	proc	near
    ;	
    ;	      SetColor (COLOR_B);
    ;	
-	push	0
+	push	15
 	call	near ptr MGRP:_SetColor
 	pop	cx
    ;	
-   ;	      Bar (x+1,y+h-16,x+w-1,y+h-1);
+   ;	      Bar (x+1,y+h-16,x+w-3,y+h-1);
    ;	
 	mov	ax,word ptr [bp+6]
 	add	ax,word ptr [bp+10]
@@ -13182,7 +13716,7 @@ _TextArea	proc	near
 	push	ax
 	mov	ax,word ptr [bp+4]
 	add	ax,word ptr [bp+8]
-	dec	ax
+	sub	ax,3
 	push	ax
 	mov	ax,word ptr [bp+6]
 	add	ax,word ptr [bp+10]
@@ -13205,7 +13739,7 @@ _TextArea	proc	near
 	mov	ax,word ptr [bp-2]
 	sub	ax,16
 	mov	word ptr [bp-2],ax
-@100@1150:
+@103@1150:
    ;	
    ;	      while (1)
    ;	      {
@@ -13215,20 +13749,20 @@ _TextArea	proc	near
 	add	ax,word ptr [bp+8]
 	sub	ax,9
 	cmp	ax,si
-	jbe	short @100@1234
+	jbe	short @103@1234
    ;	
    ;	       if (FarTABuffer [i] == 13) break;
    ;	
 	les	bx,dword ptr MGRP:_FarTABuffer
 	add	bx,di
 	cmp	byte ptr es:[bx],13
-	je	short @100@1234
+	je	short @103@1234
    ;	
    ;	       PrintChar (FarTABuffer[i++],X,Y,COLOR_F,255,0);
    ;	
 	push	0
 	push	255
-	push	15
+	push	0
 	push	word ptr [bp-2]
 	push	si
 	mov	ax,di
@@ -13243,8 +13777,8 @@ _TextArea	proc	near
    ;	       X = X + 8;
    ;	
 	add	si,8
-	jmp	short @100@1150
-@100@1234:
+	jmp	short @103@1150
+@103@1234:
 	mov	si,word ptr [bp+4]
 	add	si,5
    ;	
@@ -13253,8 +13787,8 @@ _TextArea	proc	near
    ;	      i = oldi;
    ;	
 	mov	di,word ptr [bp-6]
-	jmp	@100@2970
-@100@1262:
+	jmp	@103@2970
+@103@1262:
    ;	
    ;	     }
    ;	     break;
@@ -13271,8 +13805,8 @@ _TextArea	proc	near
    ;	
    ;	     break;
    ;	
-	jmp	@100@2970
-@100@1290:
+	jmp	@103@2970
+@103@1290:
    ;	
    ;	    }
    ;	
@@ -13284,7 +13818,7 @@ _TextArea	proc	near
 	mov	ax,word ptr [bp-2]
 	mov	word ptr [bp-12],ax
 	mov	word ptr [bp-6],0
-@100@1318:
+@103@1318:
    ;	
    ;	
    ;	    while (1)
@@ -13293,26 +13827,26 @@ _TextArea	proc	near
    ;	     if ( i == 0) break;
    ;	
 	or	di,di
-	jne short	@@52
-	jmp	@100@2970
-@@52:
+	jne short	@@56
+	jmp	@103@2970
+@@56:
    ;	
    ;	
    ;	     if ( (X == oldX) && ( (Y == (oldY-16)) || (oldi) ) ) break;
    ;	
 	cmp	si,word ptr [bp-10]
-	jne	short @100@1430
+	jne	short @103@1430
 	mov	ax,word ptr [bp-12]
 	sub	ax,16
 	cmp	ax,word ptr [bp-2]
-	jne short	@@53
-	jmp	@100@2970
-@@53:
+	jne short	@@57
+	jmp	@103@2970
+@@57:
 	cmp	word ptr [bp-6],0
-	je short	@@54
-	jmp	@100@2970
-@@54:
-@100@1430:
+	je short	@@58
+	jmp	@103@2970
+@@58:
+@103@1430:
    ;	
    ;	
    ;	     if ( X == (x+5) )
@@ -13320,9 +13854,9 @@ _TextArea	proc	near
 	mov	ax,word ptr [bp+4]
 	add	ax,5
 	cmp	ax,si
-	je short	@@55
-	jmp	@100@1962
-@@55:
+	je short	@@59
+	jmp	@103@1962
+@@59:
    ;	
    ;	     {
    ;	
@@ -13333,9 +13867,9 @@ _TextArea	proc	near
 	les	bx,dword ptr MGRP:_FarTABuffer
 	add	bx,ax
 	cmp	byte ptr es:[bx],10
-	jne short	@@56
-	jmp	@100@1682
-@@56:
+	jne short	@@60
+	jmp	@103@1682
+@@60:
    ;	
    ;	      {
    ;	       i--;
@@ -13363,9 +13897,9 @@ _TextArea	proc	near
 	add	ax,5
 	sub	ax,16
 	cmp	ax,word ptr [bp-2]
-	je short	@@57
-	jmp	@100@1962
-@@57:
+	je short	@@61
+	jmp	@103@1962
+@@61:
    ;	
    ;	       {
    ;		scroll_down (x,y+1,w,h-18,16);
@@ -13384,18 +13918,18 @@ _TextArea	proc	near
    ;	
    ;		SetColor (COLOR_B);
    ;	
-	push	0
+	push	15
 	call	near ptr MGRP:_SetColor
 	pop	cx
    ;	
-   ;		Bar (x+1,y+5,x+w-1,y+16+5);
+   ;		Bar (x+1,y+5,x+w-3,y+16+5);
    ;	
 	mov	ax,word ptr [bp+6]
 	add	ax,21
 	push	ax
 	mov	ax,word ptr [bp+4]
 	add	ax,word ptr [bp+8]
-	dec	ax
+	sub	ax,3
 	push	ax
 	mov	ax,word ptr [bp+6]
 	add	ax,5
@@ -13408,7 +13942,7 @@ _TextArea	proc	near
    ;	
    ;		SetColor (COLOR_F);
    ;	
-	push	15
+	push	0
 	call	near ptr MGRP:_SetColor
 	pop	cx
    ;	
@@ -13436,14 +13970,14 @@ _TextArea	proc	near
 	mov	dx,di
 	sub	dx,ax
 	mov	word ptr [bp-6],dx
-	jmp	short @100@1598
-@100@1542:
+	jmp	short @103@1598
+@103@1542:
    ;	
    ;		 PrintChar (FarTABuffer[oldi++],X,Y,COLOR_F,255,0);
    ;	
 	push	0
 	push	255
-	push	15
+	push	0
 	push	word ptr [bp-2]
 	push	si
 	mov	ax,word ptr [bp-6]
@@ -13455,17 +13989,17 @@ _TextArea	proc	near
 	call	near ptr MGRP:_PrintChar
 	add	sp,12
 	add	si,8
-@100@1598:
+@103@1598:
 	mov	ax,word ptr [bp+4]
 	add	ax,word ptr [bp+8]
 	sub	ax,9
 	cmp	ax,si
-	jbe	short @100@1654
+	jbe	short @103@1654
 	les	bx,dword ptr MGRP:_FarTABuffer
 	add	bx,word ptr [bp-6]
 	cmp	byte ptr es:[bx],13
-	jne	short @100@1542
-@100@1654:
+	jne	short @103@1542
+@103@1654:
    ;	
    ;		X = x + 5 + ( (w/8) - 2) * 8;
    ;	
@@ -13481,8 +14015,8 @@ _TextArea	proc	near
    ;		oldi = 1;
    ;	
 	mov	word ptr [bp-6],1
-	jmp	@100@1962
-@100@1682:
+	jmp	@103@1962
+@103@1682:
    ;	
    ;	       }
    ;	
@@ -13496,10 +14030,10 @@ _TextArea	proc	near
    ;	       for ( tad = 0;((FarTABuffer [i-3-tad] != 10) && (i-2-tad != 0)); tad++) ;
    ;	
 	mov	byte ptr [bp-7],0
-	jmp	short @100@1738
-@100@1710:
+	jmp	short @103@1738
+@103@1710:
 	inc	byte ptr [bp-7]
-@100@1738:
+@103@1738:
 	mov	al,byte ptr [bp-7]
 	mov	ah,0
 	mov	dx,di
@@ -13508,15 +14042,15 @@ _TextArea	proc	near
 	les	bx,dword ptr MGRP:_FarTABuffer
 	add	bx,dx
 	cmp	byte ptr es:[bx],10
-	je	short @100@1794
+	je	short @103@1794
 	mov	al,byte ptr [bp-7]
 	mov	ah,0
 	mov	dx,di
 	sub	dx,2
 	sub	dx,ax
 	or	dx,dx
-	jne	short @100@1710
-@100@1794:
+	jne	short @103@1710
+@103@1794:
    ;	
    ;	       if ( tad >= ((w/8)-2) ) tad = (tad % ((w/8)-1) ) ;
    ;	
@@ -13526,7 +14060,7 @@ _TextArea	proc	near
 	shr	dx,3
 	sub	dx,2
 	cmp	ax,dx
-	jb	short @100@1850
+	jb	short @103@1850
 	mov	al,byte ptr [bp-7]
 	mov	ah,0
 	mov	dx,word ptr [bp+8]
@@ -13539,7 +14073,7 @@ _TextArea	proc	near
 	pop	ax
 	div	bx
 	mov	byte ptr [bp-7],dl
-@100@1850:
+@103@1850:
    ;	
    ;	       X = x+5+(tad * 8)+8;
    ;	
@@ -13561,9 +14095,9 @@ _TextArea	proc	near
 	add	ax,5
 	sub	ax,16
 	cmp	ax,word ptr [bp-2]
-	je short	@@58
-	jmp	@100@1906
-@@58:
+	je short	@@62
+	jmp	@103@1906
+@@62:
    ;	
    ;	       {
    ;		scroll_down (x,y+1,w,h-18,16);
@@ -13582,18 +14116,18 @@ _TextArea	proc	near
    ;	
    ;		SetColor (COLOR_B);
    ;	
-	push	0
+	push	15
 	call	near ptr MGRP:_SetColor
 	pop	cx
    ;	
-   ;		Bar (x+1,y+5,x+w-1,y+16+5);
+   ;		Bar (x+1,y+5,x+w-3,y+16+5);
    ;	
 	mov	ax,word ptr [bp+6]
 	add	ax,21
 	push	ax
 	mov	ax,word ptr [bp+4]
 	add	ax,word ptr [bp+8]
-	dec	ax
+	sub	ax,3
 	push	ax
 	mov	ax,word ptr [bp+6]
 	add	ax,5
@@ -13606,7 +14140,7 @@ _TextArea	proc	near
    ;	
    ;		SetColor (COLOR_F);
    ;	
-	push	15
+	push	0
 	call	near ptr MGRP:_SetColor
 	pop	cx
    ;	
@@ -13646,7 +14180,7 @@ _TextArea	proc	near
    ;		oldi = 1;
    ;	
 	mov	word ptr [bp-6],1
-@100@1906:
+@103@1906:
    ;	
    ;	       }
    ;	
@@ -13655,8 +14189,8 @@ _TextArea	proc	near
 	mov	ax,word ptr [bp-10]
 	add	ax,8
 	cmp	ax,si
-	jbe	short @100@1962
-@100@1934:
+	jbe	short @103@1962
+@103@1934:
    ;	
    ;	       {
    ;		X -= 8;
@@ -13669,8 +14203,8 @@ _TextArea	proc	near
    ;	
    ;		break;
    ;	
-	jmp	@100@2970
-@100@1962:
+	jmp	@103@2970
+@103@1962:
    ;	
    ;	       }
    ;	      }
@@ -13682,8 +14216,8 @@ _TextArea	proc	near
    ;	     X -= 8;
    ;	
 	sub	si,8
-	jmp	@100@1318
-@100@1990:
+	jmp	@103@1318
+@103@1990:
    ;	
    ;	    }
    ;	    break;
@@ -13703,8 +14237,8 @@ _TextArea	proc	near
    ;	
    ;	    break;
    ;	
-	jmp	@100@2970
-@100@2018:
+	jmp	@103@2970
+@103@2018:
    ;	
    ;	
    ;	
@@ -13714,7 +14248,7 @@ _TextArea	proc	near
 	mov	word ptr [bp-10],si
 	mov	ax,word ptr [bp-2]
 	mov	word ptr [bp-12],ax
-@100@2046:
+@103@2046:
    ;	
    ;	    while (1)
    ;	    {
@@ -13722,23 +14256,23 @@ _TextArea	proc	near
    ;	     if ( (X == oldX) && (Y == (oldY+16)) ) break;
    ;	
 	cmp	si,word ptr [bp-10]
-	jne	short @100@2102
+	jne	short @103@2102
 	mov	ax,word ptr [bp-12]
 	add	ax,16
 	cmp	ax,word ptr [bp-2]
-	jne short	@@59
-	jmp	@100@2970
-@@59:
-@100@2102:
+	jne short	@@63
+	jmp	@103@2970
+@@63:
+@103@2102:
    ;	
    ;	     if (FarTABuffer [i] == 0) break;
    ;	
 	les	bx,dword ptr MGRP:_FarTABuffer
 	add	bx,di
 	cmp	byte ptr es:[bx],0
-	jne short	@@60
-	jmp	@100@2970
-@@60:
+	jne short	@@64
+	jmp	@103@2970
+@@64:
    ;	
    ;	
    ;	     X += 8;
@@ -13751,14 +14285,14 @@ _TextArea	proc	near
 	les	bx,dword ptr MGRP:_FarTABuffer
 	add	bx,di
 	cmp	byte ptr es:[bx],13
-	jne	short @100@2242
+	jne	short @103@2242
    ;	
    ;	     {
    ;	      if ( Y != oldY )
    ;	
 	mov	ax,word ptr [bp-2]
 	cmp	ax,word ptr [bp-12]
-	je	short @100@2214
+	je	short @103@2214
    ;	
    ;	      {
    ;	       X -= 8;
@@ -13768,8 +14302,8 @@ _TextArea	proc	near
    ;	       //i--;
    ;	       break;
    ;	
-	jmp	@100@2970
-@100@2214:
+	jmp	@103@2970
+@103@2214:
    ;	
    ;	      }
    ;	      Y += 16;
@@ -13784,7 +14318,7 @@ _TextArea	proc	near
    ;	      i++;
    ;	
 	inc	di
-@100@2242:
+@103@2242:
    ;	
    ;	     }
    ;	
@@ -13794,7 +14328,7 @@ _TextArea	proc	near
 	add	ax,word ptr [bp+8]
 	sub	ax,9
 	cmp	ax,si
-	ja	short @100@2298
+	ja	short @103@2298
    ;	
    ;	     {
    ;	      Y += 16;
@@ -13805,7 +14339,7 @@ _TextArea	proc	near
    ;	
 	mov	si,word ptr [bp+4]
 	add	si,5
-@100@2298:
+@103@2298:
    ;	
    ;	     }
    ;	
@@ -13816,9 +14350,9 @@ _TextArea	proc	near
 	add	ax,5
 	sub	ax,10
 	cmp	ax,word ptr [bp-2]
-	jbe short	@@61
-	jmp	@100@2494
-@@61:
+	jbe short	@@65
+	jmp	@103@2494
+@@65:
    ;	
    ;	     {
    ;	      oldX = X;
@@ -13841,11 +14375,11 @@ _TextArea	proc	near
    ;	
    ;	      SetColor (COLOR_B);
    ;	
-	push	0
+	push	15
 	call	near ptr MGRP:_SetColor
 	pop	cx
    ;	
-   ;	      Bar (x+1,y+h-16,x+w-1,y+h-1);
+   ;	      Bar (x+1,y+h-16,x+w-3,y+h-1);
    ;	
 	mov	ax,word ptr [bp+6]
 	add	ax,word ptr [bp+10]
@@ -13853,7 +14387,7 @@ _TextArea	proc	near
 	push	ax
 	mov	ax,word ptr [bp+4]
 	add	ax,word ptr [bp+8]
-	dec	ax
+	sub	ax,3
 	push	ax
 	mov	ax,word ptr [bp+6]
 	add	ax,word ptr [bp+10]
@@ -13884,14 +14418,14 @@ _TextArea	proc	near
    ;	      for (oldi = i; ((X < (x+w-9)) && (FarTABuffer [oldi] != 13)) ; X += 8)
    ;	
 	mov	word ptr [bp-6],di
-	jmp	short @100@2410
-@100@2354:
+	jmp	short @103@2410
+@103@2354:
    ;	
    ;	       PrintChar (FarTABuffer[oldi++],X,Y,COLOR_F,255,0);
    ;	
 	push	0
 	push	255
-	push	15
+	push	0
 	push	word ptr [bp-2]
 	push	si
 	mov	ax,word ptr [bp-6]
@@ -13903,17 +14437,17 @@ _TextArea	proc	near
 	call	near ptr MGRP:_PrintChar
 	add	sp,12
 	add	si,8
-@100@2410:
+@103@2410:
 	mov	ax,word ptr [bp+4]
 	add	ax,word ptr [bp+8]
 	sub	ax,9
 	cmp	ax,si
-	jbe	short @100@2466
+	jbe	short @103@2466
 	les	bx,dword ptr MGRP:_FarTABuffer
 	add	bx,word ptr [bp-6]
 	cmp	byte ptr es:[bx],13
-	jne	short @100@2354
-@100@2466:
+	jne	short @103@2354
+@103@2466:
    ;	
    ;	      X = oldX;
    ;	
@@ -13921,16 +14455,16 @@ _TextArea	proc	near
    ;	
    ;	      break;
    ;	
-	jmp	@100@2970
-@100@2494:
+	jmp	@103@2970
+@103@2494:
    ;	
    ;	     }
    ;	
    ;	     i++;
    ;	
 	inc	di
-	jmp	@100@2046
-@100@2522:
+	jmp	@103@2046
+@103@2522:
    ;	
    ;	    }
    ;	    break;
@@ -13941,9 +14475,9 @@ _TextArea	proc	near
 	les	bx,dword ptr MGRP:_FarTABuffer
 	add	bx,di
 	cmp	byte ptr es:[bx],0
-	jne short	@@62
-	jmp	@100@2970
-@@62:
+	jne short	@@66
+	jmp	@103@2970
+@@66:
    ;	
    ;	
    ;	    DelText (i,StrSeg,SizeB--);
@@ -13965,7 +14499,7 @@ _TextArea	proc	near
 	les	bx,dword ptr MGRP:_FarTABuffer
 	add	bx,di
 	cmp	byte ptr es:[bx],10
-	jne	short @100@2606
+	jne	short @103@2606
    ;	
    ;	    {
    ;	     DelText (i,StrSeg,SizeB--);
@@ -13981,7 +14515,7 @@ _TextArea	proc	near
    ;	     cr = 1;
    ;	
 	mov	dl,1
-@100@2606:
+@103@2606:
    ;	
    ;	    }
    ;	
@@ -13997,14 +14531,14 @@ _TextArea	proc	near
 	push	word ptr [bp+6]
 	push	word ptr [bp+4]
 	push	di
-@100@2634:
+@103@2634:
 	call	near ptr MGRP:_DispText
 	add	sp,20
    ;	
    ;	    break;
    ;	
-	jmp	@100@2970
-@100@2662:
+	jmp	@103@2970
+@103@2662:
    ;	
    ;	
    ;	   case 28:
@@ -14068,9 +14602,9 @@ _TextArea	proc	near
 	add	ax,5
 	sub	ax,10
 	cmp	ax,word ptr [bp-2]
-	jbe short	@@63
-	jmp	@100@2970
-@@63:
+	jbe short	@@67
+	jmp	@103@2970
+@@67:
    ;	
    ;	     {
    ;	      scroll_up (x,y+18,w,h-18,16);
@@ -14089,11 +14623,11 @@ _TextArea	proc	near
    ;	
    ;	      SetColor (COLOR_B);
    ;	
-	push	0
+	push	15
 	call	near ptr MGRP:_SetColor
 	pop	cx
    ;	
-   ;	      Bar (x+1,y+h-16,x+w-1,y+h-1);
+   ;	      Bar (x+1,y+h-16,x+w-3,y+h-1);
    ;	
 	mov	ax,word ptr [bp+6]
 	add	ax,word ptr [bp+10]
@@ -14101,7 +14635,7 @@ _TextArea	proc	near
 	push	ax
 	mov	ax,word ptr [bp+4]
 	add	ax,word ptr [bp+8]
-	dec	ax
+	sub	ax,3
 	push	ax
 	mov	ax,word ptr [bp+6]
 	add	ax,word ptr [bp+10]
@@ -14128,14 +14662,14 @@ _TextArea	proc	near
    ;	      for (oldi = i; ((X < (x+w-9-8)) && (FarTABuffer [oldi] != 13)) ; X += 8)
    ;	
 	mov	word ptr [bp-6],di
-	jmp	short @100@2774
-@100@2718:
+	jmp	short @103@2774
+@103@2718:
    ;	
    ;	       PrintChar (FarTABuffer[oldi++],X,Y,COLOR_F,255,0);
    ;	
 	push	0
 	push	255
-	push	15
+	push	0
 	push	word ptr [bp-2]
 	push	si
 	mov	ax,word ptr [bp-6]
@@ -14147,26 +14681,26 @@ _TextArea	proc	near
 	call	near ptr MGRP:_PrintChar
 	add	sp,12
 	add	si,8
-@100@2774:
+@103@2774:
 	mov	ax,word ptr [bp+4]
 	add	ax,word ptr [bp+8]
 	sub	ax,9
 	sub	ax,8
 	cmp	ax,si
-	jbe	short @100@2830
+	jbe	short @103@2830
 	les	bx,dword ptr MGRP:_FarTABuffer
 	add	bx,word ptr [bp-6]
 	cmp	byte ptr es:[bx],13
-	jne	short @100@2718
-@100@2830:
+	jne	short @103@2718
+@103@2830:
    ;	
    ;	      X = x+5;
    ;	
 	mov	si,word ptr [bp+4]
-@100@2858:
+@103@2858:
 	add	si,5
-	jmp	@100@2970
-@100@2886:
+	jmp	@103@2970
+@103@2886:
    ;	
    ;	     }
    ;	    break;
@@ -14217,7 +14751,7 @@ _TextArea	proc	near
 	add	ax,word ptr [bp+8]
 	sub	ax,9
 	cmp	ax,si
-	ja	short @100@2970
+	ja	short @103@2970
    ;	
    ;	    {
    ;	     X = x+5; 
@@ -14237,7 +14771,7 @@ _TextArea	proc	near
 	add	ax,5
 	sub	ax,10
 	cmp	ax,word ptr [bp-2]
-	ja	short @100@2970
+	ja	short @103@2970
    ;	
    ;	     {
    ;	      scroll_up (x,y+18,w,h-18,16);
@@ -14256,11 +14790,11 @@ _TextArea	proc	near
    ;	
    ;	      SetColor (COLOR_B);
    ;	
-	push	0
+	push	15
 	call	near ptr MGRP:_SetColor
 	pop	cx
    ;	
-   ;	      Bar (x+1,y+h-16,x+w-1,y+h-1);
+   ;	      Bar (x+1,y+h-16,x+w-3,y+h-1);
    ;	
 	mov	ax,word ptr [bp+6]
 	add	ax,word ptr [bp+10]
@@ -14268,7 +14802,7 @@ _TextArea	proc	near
 	push	ax
 	mov	ax,word ptr [bp+4]
 	add	ax,word ptr [bp+8]
-	dec	ax
+	sub	ax,3
 	push	ax
 	mov	ax,word ptr [bp+6]
 	add	ax,word ptr [bp+10]
@@ -14291,7 +14825,7 @@ _TextArea	proc	near
 	mov	ax,word ptr [bp-2]
 	sub	ax,16
 	mov	word ptr [bp-2],ax
-@100@2970:
+@103@2970:
    ;	
    ;	     }
    ;	    }
@@ -14311,18 +14845,18 @@ _TextArea	proc	near
 	push	95
 	call	near ptr MGRP:_PrintChar
 	add	sp,12
-@100@2998:
+@103@2998:
 	cmp	byte ptr MGRP:keycode,1
-	je short	@@64
-	jmp	@100@114
-@@64:
+	je short	@@68
+	jmp	@103@114
+@@68:
    ;	
    ;	 }
    ;	 PrintChar ('_',X,Y+1,COLOR_B,255,0);
    ;	
 	push	0
 	push	255
-	push	0
+	push	15
 	mov	ax,word ptr [bp-2]
 	inc	ax
 	push	ax
@@ -14349,7 +14883,7 @@ _TextArea	proc	near
    ;	 return SizeB;
    ;	
 	mov	ax,word ptr [bp+16]
-@100@3054:
+@103@3054:
    ;	
    ;	}
    ;	
@@ -14358,7 +14892,7 @@ _TextArea	proc	near
 	leave	
 	ret	
 _TextArea	endp
-@100@C114	label	word
+@103@C114	label	word
 	db	1
 	db	0
 	db	14
@@ -14375,14 +14909,14 @@ _TextArea	endp
 	db	0
 	db	83
 	db	0
-	dw	@100@2970
-	dw	@100@1990
-	dw	@100@2662
-	dw	@100@1290
-	dw	@100@310
-	dw	@100@842
-	dw	@100@2018
-	dw	@100@2522
+	dw	@103@2970
+	dw	@103@1990
+	dw	@103@2662
+	dw	@103@1290
+	dw	@103@310
+	dw	@103@842
+	dw	@103@2018
+	dw	@103@2522
    ;	
    ;	void EditBoxReadLn (unsigned int x, unsigned int y, unsigned int w,
    ;	
@@ -14447,42 +14981,42 @@ _EditBoxReadLn	proc	near
 	push	si
 	call	near ptr MGRP:_Line
 	add	sp,8
-@101@58:
+@104@58:
    ;	
    ;	 do
    ;	 {
    ;	  if (c == 0) EditKey = ReadKey ();
    ;	
 	cmp	byte ptr [bp+14],0
-	jne	short @101@114
+	jne	short @104@114
 	call	near ptr MGRP:_ReadKey
-	jmp	short @101@142
-@101@114:
+	jmp	short @104@142
+@104@114:
    ;	
    ;	  else EditKey = c;
    ;	
 	mov	al,byte ptr [bp+14]
-@101@142:
+@104@142:
 	mov	byte ptr [bp-1],al
    ;	
    ;	
    ;	  if ( (EditKey == 13) || (EditKey == 27) );
    ;	
 	cmp	byte ptr [bp-1],13
-	jne short	@@65
-	jmp	@101@478
-@@65:
+	jne short	@@69
+	jmp	@104@478
+@@69:
 	cmp	byte ptr [bp-1],27
-	jne short	@@66
-	jmp	@101@478
-@@66:
+	jne short	@@70
+	jmp	@104@478
+@@70:
    ;	
    ;	  else if (EditKey == 8)
    ;	
 	cmp	byte ptr [bp-1],8
-	je short	@@67
-	jmp	@101@310
-@@67:
+	je short	@@71
+	jmp	@104@310
+@@71:
    ;	
    ;	  {
    ;	   if (Xpos == (x+5)) continue;
@@ -14490,9 +15024,9 @@ _EditBoxReadLn	proc	near
 	mov	ax,word ptr [bp+4]
 	add	ax,5
 	cmp	ax,si
-	jne short	@@68
-	jmp	@101@478
-@@68:
+	jne short	@@72
+	jmp	@104@478
+@@72:
    ;	
    ;	   Xpos -= 8;
    ;	
@@ -14567,8 +15101,8 @@ _EditBoxReadLn	proc	near
    ;	
    ;	  }
    ;	
-	jmp	@101@478
-@101@310:
+	jmp	@104@478
+@104@310:
    ;	
    ;	  else
    ;	  {
@@ -14579,14 +15113,14 @@ _EditBoxReadLn	proc	near
 	mov	dx,word ptr [bp+4]
 	add	dx,word ptr [bp+8]
 	cmp	ax,dx
-	jbe short	@@69
-	jmp	@101@478
-@@69:
+	jbe short	@@73
+	jmp	@104@478
+@@73:
    ;	
    ;	   if (pwd) PrintChar ('*',Xpos,y+5,0,255,0);
    ;	
 	cmp	byte ptr [bp+16],0
-	je	short @101@394
+	je	short @104@394
 	push	0
 	push	255
 	push	0
@@ -14595,8 +15129,8 @@ _EditBoxReadLn	proc	near
 	push	ax
 	push	si
 	push	42
-	jmp	short @101@422
-@101@394:
+	jmp	short @104@422
+@104@394:
    ;	
    ;	   else PrintChar (EditKey,Xpos,y+5,0,255,0);
    ;	
@@ -14609,7 +15143,7 @@ _EditBoxReadLn	proc	near
 	push	si
 	mov	al,byte ptr [bp-1]
 	push	ax
-@101@422:
+@104@422:
 	call	near ptr MGRP:_PrintChar
 	add	sp,12
    ;	
@@ -14671,20 +15205,20 @@ _EditBoxReadLn	proc	near
    ;	   Xpos += 8;
    ;	
 	add	si,8
-@101@478:
+@104@478:
    ;	
    ;	  }
    ;	 } while ( (EditKey != 13) && (EditKey != 27) && (c==0) );
    ;	
 	cmp	byte ptr [bp-1],13
-	je	short @101@562
+	je	short @104@562
 	cmp	byte ptr [bp-1],27
-	je	short @101@562
+	je	short @104@562
 	cmp	byte ptr [bp+14],0
-	jne short	@@70
-	jmp	@101@58
-@@70:
-@101@562:
+	jne short	@@74
+	jmp	@104@58
+@@74:
+@104@562:
    ;	
    ;	// SetColor (15); Line (Xpos,y+5,Xpos,y+16); SetColor (0);
    ;	// Rectangle ( x,y,x+w,y+16+3); SetColor (0);
@@ -14714,30 +15248,30 @@ _FindLastEditBox	proc	near
    ;	 if (LastEditBox == (CONTROL)0) return (CONTROL)0;
    ;	
 	cmp	dword ptr MGRP:LastEditBox,large 0
-	je	short @102@254
+	je	short @105@254
    ;	
    ;	
    ;	 if (LastEditBox->ControlType == CONTROL_TYPE_EDITBOX)
    ;	
 	les	bx,dword ptr MGRP:LastEditBox
 	cmp	byte ptr es:[bx+8],2
-	jne	short @102@114
-@102@86:
+	jne	short @105@114
+@105@86:
    ;	
    ;	  return LastEditBox;
    ;	
 	mov	dx,word ptr MGRP:LastEditBox+2
 	mov	ax,word ptr MGRP:LastEditBox
-	jmp	short @102@282
-@102@114:
+	jmp	short @105@282
+@105@114:
    ;	
    ;	
    ;	 LastEditBox = fhWnd->LastControl;
    ;	
 	les	bx,dword ptr [bp+4]
 	mov	eax,dword ptr es:[bx+24]
-	jmp	short @102@198
-@102@142:
+	jmp	short @105@198
+@105@142:
    ;	
    ;	
    ;	 while (LastEditBox != (CONTROL)0)
@@ -14746,18 +15280,18 @@ _FindLastEditBox	proc	near
    ;	
 	les	bx,dword ptr MGRP:LastEditBox
 	cmp	byte ptr es:[bx+8],2
-	je	short @102@86
+	je	short @105@86
    ;	
    ;	   return LastEditBox;
    ;	  LastEditBox = LastEditBox->prev;
    ;	
 	les	bx,dword ptr MGRP:LastEditBox
 	mov	eax,dword ptr es:[bx+14]
-@102@198:
+@105@198:
 	mov	dword ptr MGRP:LastEditBox,eax
 	cmp	dword ptr MGRP:LastEditBox,large 0
-	jne	short @102@142
-@102@254:
+	jne	short @105@142
+@105@254:
    ;	
    ;	 }
    ;	
@@ -14765,7 +15299,7 @@ _FindLastEditBox	proc	near
    ;	
 	xor	dx,dx
 	xor	ax,ax
-@102@282:
+@105@282:
    ;	
    ;	}
    ;	
@@ -14792,29 +15326,29 @@ _FindLastButton	proc	near
    ;	  if (LastButton == (CONTROL)0) return (CONTROL)0;
    ;	
 	cmp	dword ptr [bp-4],large 0
-	je	short @103@254
+	je	short @106@254
    ;	
    ;	 if (LastButton->ControlType == CONTROL_TYPE_BUTTON)
    ;	
 	les	bx,dword ptr [bp-4]
 	cmp	byte ptr es:[bx+8],1
-	jne	short @103@114
-@103@86:
+	jne	short @106@114
+@106@86:
    ;	
    ;	  return LastButton;
    ;	
 	mov	dx,word ptr [bp-2]
 	mov	ax,word ptr [bp-4]
-	jmp	short @103@282
-@103@114:
+	jmp	short @106@282
+@106@114:
    ;	
    ;	
    ;	 LastButton = fhWnd->LastControl;
    ;	
 	les	bx,dword ptr [bp+4]
 	mov	eax,dword ptr es:[bx+24]
-	jmp	short @103@198
-@103@142:
+	jmp	short @106@198
+@106@142:
    ;	
    ;	
    ;	 while (LastButton != (CONTROL)0)
@@ -14823,18 +15357,18 @@ _FindLastButton	proc	near
    ;	
 	les	bx,dword ptr [bp-4]
 	cmp	byte ptr es:[bx+8],1
-	je	short @103@86
+	je	short @106@86
    ;	
    ;	   return LastButton;
    ;	  LastButton = LastButton->prev;
    ;	
 	les	bx,dword ptr [bp-4]
 	mov	eax,dword ptr es:[bx+14]
-@103@198:
+@106@198:
 	mov	dword ptr [bp-4],eax
 	cmp	dword ptr [bp-4],large 0
-	jne	short @103@142
-@103@254:
+	jne	short @106@142
+@106@254:
    ;	
    ;	 }
    ;	
@@ -14842,7 +15376,7 @@ _FindLastButton	proc	near
    ;	
 	xor	dx,dx
 	xor	ax,ax
-@103@282:
+@106@282:
    ;	
    ;	}
    ;	
@@ -14901,7 +15435,7 @@ _EditBoxPut	proc	near
    ;	 if (dumControl == (CONTROL)0) return;
    ;	
 	cmp	dword ptr [bp-4],large 0
-	je	short @105@86
+	je	short @108@86
    ;	
    ;	
    ;	 hidemouse ();
@@ -14929,7 +15463,7 @@ _EditBoxPut	proc	near
    ;	 showmouse ();
    ;	
 	call	near ptr MGRP:_showmouse
-@105@86:
+@108@86:
    ;	
    ;	}
    ;	
@@ -14947,26 +15481,26 @@ _TurnControl	proc	near
    ;	 if (topWnd == (HWND)0) return;
    ;	
 	cmp	dword ptr MGRP:topWnd,large 0
-	jne short	@@71
-	jmp	@106@422
-@@71:
+	jne short	@@75
+	jmp	@109@422
+@@75:
    ;	
    ;	 if (topWnd->ActiveControl == (CONTROL)0) return;
    ;	
 	les	bx,dword ptr MGRP:topWnd
 	cmp	dword ptr es:[bx+28],large 0
-	jne short	@@72
-	jmp	@106@422
-@@72:
+	jne short	@@76
+	jmp	@109@422
+@@76:
    ;	
    ;	 if (topWnd->FirstControl == topWnd->LastControl) return;
    ;	
 	les	bx,dword ptr MGRP:topWnd
 	mov	eax,dword ptr es:[bx+20]
 	cmp	eax,dword ptr es:[bx+24]
-	jne short	@@73
-	jmp	@106@422
-@@73:
+	jne short	@@77
+	jmp	@109@422
+@@77:
    ;	
    ;	
    ;	 hidemouse ();
@@ -15018,17 +15552,17 @@ _TurnControl	proc	near
    ;	
 	les	bx,dword ptr MGRP:dumControl
 	cmp	dword ptr es:[bx+14],large 0
-	jne	short @106@170
+	jne	short @109@170
 	les	bx,dword ptr MGRP:topWnd
 	mov	eax,dword ptr es:[bx+24]
-	jmp	short @106@198
-@106@170:
+	jmp	short @109@198
+@109@170:
    ;	
    ;	 else dumControl = dumControl->prev;
    ;	
 	les	bx,dword ptr MGRP:dumControl
 	mov	eax,dword ptr es:[bx+14]
-@106@198:
+@109@198:
 	mov	dword ptr MGRP:dumControl,eax
    ;	
    ;	 SetColor (0);     
@@ -15063,9 +15597,9 @@ _TurnControl	proc	near
    ;	
 	les	bx,dword ptr MGRP:dumControl
 	cmp	byte ptr es:[bx+8],2
-	je short	@@74
-	jmp	@106@338
-@@74:
+	je short	@@78
+	jmp	@109@338
+@@78:
    ;	
    ;	 {
    ;	  LastEditBox = activeEditBox; //FindLastEditBox (topWnd);
@@ -15076,7 +15610,7 @@ _TurnControl	proc	near
    ;	  if (LastEditBox != (CONTROL)0 )
    ;	
 	cmp	dword ptr MGRP:LastEditBox,large 0
-	je	short @106@310
+	je	short @109@310
    ;	
    ;	  {
    ;	   SetColor (15);
@@ -15134,7 +15668,7 @@ _TurnControl	proc	near
 	push	dx
 	call	near ptr MGRP:_Line
 	add	sp,8
-@106@310:
+@109@310:
    ;	
    ;	  }
    ;	  SetColor (0);
@@ -15197,7 +15731,7 @@ _TurnControl	proc	near
    ;	
 	mov	eax,dword ptr MGRP:dumControl
 	mov	dword ptr MGRP:_activeEditBox,eax
-@106@338:
+@109@338:
    ;	
    ;	 }
    ;	
@@ -15205,13 +15739,13 @@ _TurnControl	proc	near
    ;	
 	les	bx,dword ptr MGRP:dumControl
 	cmp	byte ptr es:[bx+8],1
-	jne	short @106@394
+	jne	short @109@394
    ;	
    ;	  activeButton = dumControl;
    ;	
 	mov	eax,dword ptr MGRP:dumControl
 	mov	dword ptr MGRP:_activeButton,eax
-@106@394:
+@109@394:
    ;	
    ;	
    ;	 topWnd->ActiveControl = dumControl;
@@ -15223,7 +15757,7 @@ _TurnControl	proc	near
    ;	 showmouse ();
    ;	
 	call	near ptr MGRP:_showmouse
-@106@422:
+@109@422:
    ;	
    ;	}
    ;	
@@ -15242,17 +15776,17 @@ _ExecuteControl	proc	near
    ;	 if (topWnd == (HWND)0) return;
    ;	
 	cmp	dword ptr MGRP:topWnd,large 0
-	jne short	@@75
-	jmp	@107@646
-@@75:
+	jne short	@@79
+	jmp	@110@646
+@@79:
    ;	
    ;	 if (topWnd->FirstControl == (CONTROL)0) return;
    ;	
 	les	bx,dword ptr MGRP:topWnd
 	cmp	dword ptr es:[bx+20],large 0
-	jne short	@@76
-	jmp	@107@646
-@@76:
+	jne short	@@80
+	jmp	@110@646
+@@80:
    ;	
    ;	
    ;	 dumControl = topWnd->ActiveControl;
@@ -15270,12 +15804,12 @@ _ExecuteControl	proc	near
 	dec	ax
 	mov	bx,ax
 	cmp	bx,3
-	jbe short	@@77
-	jmp	@107@590
-@@77:
+	jbe short	@@81
+	jmp	@110@590
+@@81:
 	shl	bx,1
-	jmp	word ptr cs:@107@C594[bx]
-@107@198:
+	jmp	word ptr cs:@110@C594[bx]
+@110@198:
    ;	
    ;	 {
    ;	  case CONTROL_TYPE_BUTTON:
@@ -15327,12 +15861,12 @@ _ExecuteControl	proc	near
    ;	   if (mouse_status) while ( bmouse () == 1 );
    ;	
 	cmp	word ptr MGRP:mouse_status,0
-	je	short @107@254
-@107@226:
+	je	short @110@254
+@110@226:
 	call	near ptr MGRP:_bmouse
 	cmp	ax,1
-	je	short @107@226
-@107@254:
+	je	short @110@226
+@110@254:
    ;	
    ;	   
    ;	   Button (dumControl->x,dumControl->y,dumControl->x+dumControl->w,
@@ -15377,11 +15911,11 @@ _ExecuteControl	proc	near
    ;	   if (Pa == 2) topWnd->ActiveControl = tempControl;
    ;	
 	cmp	byte ptr MGRP:_Pa,2
-	jne	short @107@310
+	jne	short @110@310
 	les	bx,dword ptr MGRP:topWnd
 	mov	eax,dword ptr MGRP:tempControl
 	mov	dword ptr es:[bx+28],eax
-@107@310:
+@110@310:
    ;	
    ;	   Pa = 0;
    ;	
@@ -15391,14 +15925,14 @@ _ExecuteControl	proc	near
    ;	
 	les	bx,dword ptr MGRP:topWnd
 	cmp	dword ptr es:[bx+16],large 0
-	jne short	@@78
-	jmp	@107@646
-@@78:
-@107@338:
+	jne short	@@82
+	jmp	@110@646
+@@82:
+@110@338:
 	les	bx,dword ptr MGRP:topWnd
 	call	dword ptr es:[bx+16]
-	jmp	@107@646
-@107@366:
+	jmp	@110@646
+@110@366:
    ;	
    ;	   break;
    ;	
@@ -15411,9 +15945,9 @@ _ExecuteControl	proc	near
    ;	  if (activeButton != (CONTROL)0)
    ;	
 	cmp	dword ptr MGRP:_activeButton,large 0
-	jne short	@@79
-	jmp	@107@646
-@@79:
+	jne short	@@83
+	jmp	@110@646
+@@83:
    ;	
    ;	  {
    ;	   topWnd->ActiveControl = activeButton;
@@ -15438,12 +15972,12 @@ _ExecuteControl	proc	near
    ;	   if (xmod != 1) ExecuteControl ();
    ;	
 	cmp	byte ptr MGRP:_xmod,1
-	jne short	@@80
-	jmp	@107@646
-@@80:
+	jne short	@@84
+	jmp	@110@646
+@@84:
 	call	near ptr MGRP:_ExecuteControl
-	jmp	@107@646
-@107@450:
+	jmp	@110@646
+@110@450:
    ;	
    ;	
    ;	   //topWnd->ActiveControl = dumControl;
@@ -15525,8 +16059,8 @@ _ExecuteControl	proc	near
 	sub	dx,ax
 	les	bx,dword ptr MGRP:dumControl
 	mov	word ptr es:[bx+24],dx
-	jmp	@107@562
-@107@478:
+	jmp	@110@562
+@110@478:
    ;	
    ;	   showmouse ();
    ;	   break;
@@ -15545,12 +16079,12 @@ _ExecuteControl	proc	near
    ;	
 	mov	ax,word ptr es:[bx+20]
 	cmp	ax,word ptr es:[bx+22]
-	jne	short @107@534
+	jne	short @110@534
    ;	
    ;	    dumControl->word1 = 0;
    ;	
 	mov	word ptr es:[bx+20],0
-@107@534:
+@110@534:
    ;	
    ;	   memcpy (_CS,(unsigned int)TempString,dumControl->StrSegment,dumControl->StrOffset+PosString ((char far*)(dumControl->StrSegme
    ;	
@@ -15631,7 +16165,7 @@ _ExecuteControl	proc	near
 	push	ax
 	call	near ptr MGRP:_OutTextXY
 	add	sp,6
-@107@562:
+@110@562:
    ;	
    ;	   showmouse ();
    ;	
@@ -15639,8 +16173,8 @@ _ExecuteControl	proc	near
    ;	
    ;	   break;
    ;	
-	jmp	short @107@646
-@107@590:
+	jmp	short @110@646
+@110@590:
    ;	
    ;	
    ;	  default: // modification
@@ -15652,9 +16186,9 @@ _ExecuteControl	proc	near
    ;	
 	les	bx,dword ptr MGRP:topWnd
 	cmp	dword ptr es:[bx+16],large 0
-	je	short @107@646
-	jmp	@107@338
-@107@646:
+	je	short @110@646
+	jmp	@110@338
+@110@646:
    ;	
    ;	   break;
    ;	 }
@@ -15663,11 +16197,11 @@ _ExecuteControl	proc	near
 	pop	si
 	ret	
 _ExecuteControl	endp
-@107@C594	label	word
-	dw	@107@198
-	dw	@107@366
-	dw	@107@450
-	dw	@107@478
+@110@C594	label	word
+	dw	@110@198
+	dw	@110@366
+	dw	@110@450
+	dw	@110@478
    ;	
    ;	CONTROL CreateControl (unsigned int x, unsigned int y, unsigned int w,
    ;	
@@ -15696,7 +16230,7 @@ _CreateControl	proc	near
    ;	
 	les	bx,dword ptr [bp+12]
 	cmp	dword ptr es:[bx+28],large 0
-	je	short @108@86
+	je	short @111@86
    ;	
    ;	 {
    ;	  dumControl = hWnd->ActiveControl;
@@ -15730,7 +16264,7 @@ _CreateControl	proc	near
 	push	word ptr es:[bx]
 	call	near ptr MGRP:_Rectangle
 	add	sp,8
-@108@86:
+@111@86:
    ;	
    ;	 }
    ;	 dumControl = (unsigned long) malloc (2);
@@ -15822,7 +16356,7 @@ _CreateControl	proc	near
    ;	
 	les	bx,dword ptr [bp+12]
 	cmp	dword ptr es:[bx+20],large 0
-	jne	short @108@198
+	jne	short @111@198
    ;	
    ;	 {
    ;	  hWnd->FirstControl = dumControl;
@@ -15837,8 +16371,8 @@ _CreateControl	proc	near
    ;	
    ;	 }
    ;	
-	jmp	short @108@226
-@108@198:
+	jmp	short @111@226
+@111@198:
    ;	
    ;	 else
    ;	  dumControl->prev = hWnd->ActiveControl;
@@ -15847,7 +16381,7 @@ _CreateControl	proc	near
 	mov	eax,dword ptr es:[bx+28]
 	les	bx,dword ptr MGRP:dumControl
 	mov	dword ptr es:[bx+14],eax
-@108@226:
+@111@226:
    ;	
    ;	
    ;	 hWnd->ActiveControl = dumControl;
@@ -15868,12 +16402,12 @@ _CreateControl	proc	near
 	dec	ax
 	mov	bx,ax
 	cmp	bx,3
-	jbe short	@@81
-	jmp	@108@478
-@@81:
+	jbe short	@@85
+	jmp	@111@478
+@@85:
 	shl	bx,1
-	jmp	word ptr cs:@108@C354[bx]
-@108@338:
+	jmp	word ptr cs:@111@C354[bx]
+@111@338:
    ;	
    ;	 {
    ;	 case CONTROL_TYPE_BUTTON:
@@ -15909,8 +16443,8 @@ _CreateControl	proc	near
    ;	
    ;	  break;
    ;	
-	jmp	@108@478
-@108@366:
+	jmp	@111@478
+@111@366:
    ;	
    ;	 case CONTROL_TYPE_EDITBOX:
    ;	  SetColor (15);
@@ -16132,9 +16666,9 @@ _CreateControl	proc	near
    ;	 if (LastEditBox != (CONTROL)0 )
    ;	
 	cmp	dword ptr MGRP:LastEditBox,large 0
-	jne short	@@82
-	jmp	@108@478
-@@82:
+	jne short	@@86
+	jmp	@111@478
+@@86:
    ;	
    ;	 {
    ;	 memcpy (_CS,(unsigned int)TempString,LastEditBox->StrSegment,
@@ -16195,8 +16729,8 @@ _CreateControl	proc	near
 	push	dx
 	call	near ptr MGRP:_Line
 	add	sp,8
-	jmp	@108@478
-@108@422:
+	jmp	@111@478
+@111@422:
    ;	
    ;	 }
    ;	
@@ -16206,11 +16740,11 @@ _CreateControl	proc	near
    ;	 case CONTROL_TYPE_TXTAREA:
    ;	  SetColor (COLOR_B);
    ;	
-	push	0
+	push	15
 	call	near ptr MGRP:_SetColor
 	pop	cx
    ;	
-   ;	  Bar (x+hWnd->x+5,y+hWnd->y+20,x+hWnd->x+w+5,y+hWnd->y+h+20+1);
+   ;	  Bar (x+hWnd->x+5,y+hWnd->y+20,x+hWnd->x+w+2,y+hWnd->y+h+20+1);
    ;	
 	les	bx,dword ptr [bp+12]
 	mov	ax,word ptr [bp+6]
@@ -16221,7 +16755,7 @@ _CreateControl	proc	near
 	mov	ax,di
 	add	ax,word ptr es:[bx]
 	add	ax,word ptr [bp+8]
-	add	ax,5
+	add	ax,2
 	push	ax
 	mov	ax,word ptr [bp+6]
 	add	ax,word ptr es:[bx+2]
@@ -16299,8 +16833,8 @@ _CreateControl	proc	near
    ;	
    ;	  break;
    ;	
-	jmp	@108@478
-@108@450:
+	jmp	@111@478
+@111@450:
    ;	
    ;	 case CONTROL_TYPE_CYCLER:
    ;	  SetColor (15);
@@ -16822,7 +17356,7 @@ _CreateControl	proc	near
    ;	
    ;	  break;
    ;	
-@108@478:
+@111@478:
    ;	
    ;	
    ;	 }
@@ -16869,11 +17403,11 @@ _CreateControl	proc	near
 	pop	bp
 	ret	
 _CreateControl	endp
-@108@C354	label	word
-	dw	@108@338
-	dw	@108@366
-	dw	@108@422
-	dw	@108@450
+@111@C354	label	word
+	dw	@111@338
+	dw	@111@366
+	dw	@111@422
+	dw	@111@450
 _quit	label	word
 	db	0
 	db	0
@@ -16884,8 +17418,8 @@ _quit	label	word
 _WindowManager	proc	near
 	enter	4,0
 	push	si
-	jmp	@109@1906
-@109@58:
+	jmp	@112@1990
+@112@58:
    ;	
    ;	{
    ;	 char is_control;
@@ -16902,9 +17436,9 @@ _WindowManager	proc	near
    ;	
 	call	near ptr MGRP:_bmouse
 	cmp	ax,2
-	jne	short @109@142
+	jne	short @112@142
 	cmp	word ptr MGRP:mouse_status,0
-	je	short @109@142
+	je	short @112@142
    ;	
    ;	  {
    ;	   TickMenu ();
@@ -16913,8 +17447,8 @@ _WindowManager	proc	near
    ;	
    ;	  }
    ;	
-	jmp	@109@1430
-@109@142:
+	jmp	@112@1430
+@112@142:
    ;	
    ;	  else
    ;	  /*if ( (bmouse () == 3) && mouse_status)
@@ -16930,21 +17464,21 @@ _WindowManager	proc	near
    ;	
 	call	near ptr MGRP:_bmouse
 	cmp	ax,1
-	je short	@@83
-	jmp	@109@1430
-@@83:
+	je short	@@87
+	jmp	@112@1430
+@@87:
 	cmp	word ptr MGRP:mouse_status,0
-	jne short	@@84
-	jmp	@109@1430
-@@84:
+	jne short	@@88
+	jmp	@112@1430
+@@88:
    ;	
    ;	  {
    ;	   if (topWnd == (HWND)0) continue;
    ;	
 	cmp	dword ptr MGRP:topWnd,large 0
-	jne short	@@85
-	jmp	@109@1906
-@@85:
+	jne short	@@89
+	jmp	@112@1990
+@@89:
    ;	
    ;	   
    ;	   is_control = 0;
@@ -16960,30 +17494,30 @@ _WindowManager	proc	near
 	les	bx,dword ptr MGRP:topWnd
 	mov	ax,word ptr es:[bx]
 	cmp	ax,word ptr MGRP:mx
-	jb short	@@86
-	jmp	@109@1122
-@@86:
+	jb short	@@90
+	jmp	@112@1122
+@@90:
 	mov	ax,word ptr es:[bx+2]
 	cmp	ax,word ptr MGRP:my
-	jb short	@@87
-	jmp	@109@1122
-@@87:
+	jb short	@@91
+	jmp	@112@1122
+@@91:
 	push	es
 	mov	si,word ptr MGRP:topWnd
 	mov	ax,word ptr es:[si]
 	pop	es
 	add	ax,word ptr es:[bx+4]
 	cmp	ax,word ptr MGRP:mx
-	ja short	@@88
-	jmp	@109@1122
-@@88:
+	ja short	@@92
+	jmp	@112@1122
+@@92:
 	mov	es,word ptr MGRP:topWnd+2
 	mov	ax,word ptr es:[bx+2]
 	add	ax,word ptr es:[bx+6]
 	cmp	ax,word ptr MGRP:my
-	ja short	@@89
-	jmp	@109@1122
-@@89:
+	ja short	@@93
+	jmp	@112@1122
+@@93:
    ;	
    ;	   {
    ;	    if (  (mx > topWnd->x)&&(my > topWnd->y)
@@ -16993,18 +17527,18 @@ _WindowManager	proc	near
    ;	
 	mov	ax,word ptr es:[bx]
 	cmp	ax,word ptr MGRP:mx
-	jae	short @109@478
+	jae	short @112@478
 	mov	ax,word ptr es:[bx+2]
 	cmp	ax,word ptr MGRP:my
-	jae	short @109@478
+	jae	short @112@478
 	mov	ax,word ptr es:[bx]
 	add	ax,15
 	cmp	ax,word ptr MGRP:mx
-	jbe	short @109@478
+	jbe	short @112@478
 	mov	ax,word ptr es:[bx+2]
 	add	ax,15
 	cmp	ax,word ptr MGRP:my
-	jbe	short @109@478
+	jbe	short @112@478
    ;	
    ;	    {
    ;	     DestroyWindow (topWnd);
@@ -17012,8 +17546,8 @@ _WindowManager	proc	near
 	push	word ptr MGRP:topWnd+2
 	push	bx
 	call	near ptr MGRP:_DestroyWindow
-	jmp	@109@1318
-@109@478:
+	jmp	@112@1318
+@112@478:
    ;	
    ;	    }
    ;	   else if (  (mx > (topWnd->x+15))&&(my > topWnd->y)
@@ -17025,22 +17559,22 @@ _WindowManager	proc	near
 	mov	ax,word ptr es:[bx]
 	add	ax,15
 	cmp	ax,word ptr MGRP:mx
-	jae	short @109@618
+	jae	short @112@618
 	mov	ax,word ptr es:[bx+2]
 	cmp	ax,word ptr MGRP:my
-	jae	short @109@618
+	jae	short @112@618
 	push	es
 	mov	si,word ptr MGRP:topWnd
 	mov	ax,word ptr es:[si]
 	pop	es
 	add	ax,word ptr es:[bx+4]
 	cmp	ax,word ptr MGRP:mx
-	jbe	short @109@618
+	jbe	short @112@618
 	mov	es,word ptr MGRP:topWnd+2
 	mov	ax,word ptr es:[bx+2]
 	add	ax,15
 	cmp	ax,word ptr MGRP:my
-	jbe	short @109@618
+	jbe	short @112@618
    ;	
    ;	   {
    ;	    MoveWindow ();
@@ -17049,8 +17583,8 @@ _WindowManager	proc	near
    ;	
    ;	   }
    ;	
-	jmp	@109@1430
-@109@618:
+	jmp	@112@1430
+@112@618:
    ;	
    ;	
    ;	    else
@@ -17059,7 +17593,7 @@ _WindowManager	proc	near
    ;	
 	les	bx,dword ptr MGRP:topWnd
 	mov	eax,dword ptr es:[bx+24]
-@109@646:
+@112@646:
 	mov	dword ptr MGRP:dumControl,eax
    ;	
    ;	     do
@@ -17072,30 +17606,30 @@ _WindowManager	proc	near
 	les	bx,dword ptr MGRP:dumControl
 	mov	ax,word ptr es:[bx]
 	cmp	ax,word ptr MGRP:mx
-	jb short	@@90
-	jmp	@109@982
-@@90:
+	jb short	@@94
+	jmp	@112@982
+@@94:
 	mov	ax,word ptr es:[bx+2]
 	cmp	ax,word ptr MGRP:my
-	jb short	@@91
-	jmp	@109@982
-@@91:
+	jb short	@@95
+	jmp	@112@982
+@@95:
 	push	es
 	mov	si,word ptr MGRP:dumControl
 	mov	ax,word ptr es:[si]
 	pop	es
 	add	ax,word ptr es:[bx+4]
 	cmp	ax,word ptr MGRP:mx
-	ja short	@@92
-	jmp	@109@982
-@@92:
+	ja short	@@96
+	jmp	@112@982
+@@96:
 	mov	es,word ptr MGRP:dumControl+2
 	mov	ax,word ptr es:[bx+2]
 	add	ax,word ptr es:[bx+6]
 	cmp	ax,word ptr MGRP:my
-	ja short	@@93
-	jmp	@109@982
-@@93:
+	ja short	@@97
+	jmp	@112@982
+@@97:
    ;	
    ;	      {
    ;	       is_control = 1;
@@ -17152,9 +17686,9 @@ _WindowManager	proc	near
    ;	
 	les	bx,dword ptr MGRP:dumControl
 	cmp	byte ptr es:[bx+8],2
-	je short	@@94
-	jmp	@109@898
-@@94:
+	je short	@@98
+	jmp	@112@898
+@@98:
    ;	
    ;	 {
    ;	  LastEditBox = activeEditBox; //FindLastEditBox (topWnd);
@@ -17165,7 +17699,7 @@ _WindowManager	proc	near
    ;	  if (LastEditBox != (CONTROL)0 )
    ;	
 	cmp	dword ptr MGRP:LastEditBox,large 0
-	je	short @109@870
+	je	short @112@870
    ;	
    ;	  {
    ;	   SetColor (15);
@@ -17223,7 +17757,7 @@ _WindowManager	proc	near
 	push	dx
 	call	near ptr MGRP:_Line
 	add	sp,8
-@109@870:
+@112@870:
    ;	
    ;	  }
    ;	  SetColor (0);
@@ -17286,7 +17820,7 @@ _WindowManager	proc	near
    ;	
 	mov	eax,dword ptr MGRP:dumControl
 	mov	dword ptr MGRP:_activeEditBox,eax
-@109@898:
+@112@898:
    ;	
    ;	 }
    ;	
@@ -17327,20 +17861,20 @@ _WindowManager	proc	near
    ;	       ExecuteControl ();
    ;	
 	call	near ptr MGRP:_ExecuteControl
-@109@926:
+@112@926:
    ;	
    ;	
    ;	       while ( bmouse () == 1 ) ;
    ;	
 	call	near ptr MGRP:_bmouse
 	cmp	ax,1
-	je	short @109@926
+	je	short @112@926
    ;	
    ;	
    ;	       break;
    ;	
-	jmp	short @109@1038
-@109@982:
+	jmp	short @112@1038
+@112@982:
    ;	
    ;	      }
    ;	      if (dumControl == topWnd->FirstControl) break;
@@ -17348,14 +17882,14 @@ _WindowManager	proc	near
 	les	bx,dword ptr MGRP:topWnd
 	mov	eax,dword ptr es:[bx+20]
 	cmp	eax,dword ptr MGRP:dumControl
-	je	short @109@1038
+	je	short @112@1038
    ;	
    ;	      dumControl = dumControl->prev;
    ;	
 	les	bx,dword ptr MGRP:dumControl
 	mov	eax,dword ptr es:[bx+14]
-	jmp	@109@646
-@109@1038:
+	jmp	@112@646
+@112@1038:
    ;	
    ;	     } while ( 1 );
    ;	
@@ -17374,28 +17908,28 @@ _WindowManager	proc	near
    ;	
 	les	bx,dword ptr MGRP:topWnd
 	cmp	dword ptr es:[bx+16],large 0
-	je	short @109@1430
+	je	short @112@1430
 	mov	al,byte ptr [bp-1]
 	cbw	
 	or	ax,ax
-	jne	short @109@1430
+	jne	short @112@1430
 	call	dword ptr es:[bx+16]
-	jmp	short @109@1430
-@109@1122:
+	jmp	short @112@1430
+@112@1122:
    ;	
    ;	    }
    ;	   }
    ;	   else if (is_full_app == 0) 
    ;	
 	cmp	byte ptr MGRP:is_full_app,0
-	jne	short @109@1430
+	jne	short @112@1430
    ;	
    ;	   {
    ;	    dumWnd = topWnd->prev;
    ;	
 	les	bx,dword ptr MGRP:topWnd
-	jmp	short @109@1374
-@109@1178:
+	jmp	short @112@1374
+@112@1178:
    ;	
    ;	    while ( dumWnd != (HWND)0)
    ;	    {
@@ -17407,22 +17941,22 @@ _WindowManager	proc	near
 	les	bx,dword ptr MGRP:dumWnd
 	mov	ax,word ptr es:[bx]
 	cmp	ax,word ptr MGRP:mx
-	jae	short @109@1346
+	jae	short @112@1346
 	mov	ax,word ptr es:[bx+2]
 	cmp	ax,word ptr MGRP:my
-	jae	short @109@1346
+	jae	short @112@1346
 	push	es
 	mov	si,word ptr MGRP:dumWnd
 	mov	ax,word ptr es:[si]
 	pop	es
 	add	ax,word ptr es:[bx+4]
 	cmp	ax,word ptr MGRP:mx
-	jbe	short @109@1346
+	jbe	short @112@1346
 	mov	es,word ptr MGRP:dumWnd+2
 	mov	ax,word ptr es:[bx+2]
 	add	ax,word ptr es:[bx+6]
 	cmp	ax,word ptr MGRP:my
-	jbe	short @109@1346
+	jbe	short @112@1346
    ;	
    ;	     {
    ;	      SwitchWindow (dumWnd);
@@ -17430,24 +17964,24 @@ _WindowManager	proc	near
 	push	word ptr MGRP:dumWnd+2
 	push	bx
 	call	near ptr MGRP:_SwitchWindow
-@109@1318:
+@112@1318:
 	add	sp,4
    ;	
    ;	      break;
    ;	
-	jmp	short @109@1430
-@109@1346:
+	jmp	short @112@1430
+@112@1346:
    ;	
    ;	     }
    ;	     dumWnd = dumWnd->prev;
    ;	
 	les	bx,dword ptr MGRP:dumWnd
-@109@1374:
+@112@1374:
 	mov	eax,dword ptr es:[bx+12]
 	mov	dword ptr MGRP:dumWnd,eax
 	cmp	dword ptr MGRP:dumWnd,large 0
-	jne	short @109@1178
-@109@1430:
+	jne	short @112@1178
+@112@1430:
    ;	
    ;	    }
    ;	   }
@@ -17461,7 +17995,9 @@ _WindowManager	proc	near
    ;	
 	call	near ptr MGRP:_is_key
 	or	al,al
-	je	short @109@1906
+	jne short	@@99
+	jmp	@112@1990
+@@99:
    ;	
    ;	  {
    ;	   Xkey = Xgetch ();
@@ -17479,86 +18015,107 @@ _WindowManager	proc	near
 	mov	ax,word ptr MGRP:_Xkey
 	mov	word ptr [bp-4],ax
 	mov	cx,6
-	mov	bx,offset @109@C50
-@109@1542:
+	mov	bx,offset @112@C50
+@112@1542:
 	mov	ax,word ptr cs:[bx]
 	cmp	ax,word ptr [bp-4]
-	je	short @109@1626
+	je	short @112@1626
 	add	bx,2
-	loop	short @109@1542
-	jmp	short @109@1878
-@109@1626:
+	loop	short @112@1542
+	jmp	short @112@1878
+@112@1626:
 	jmp	word ptr cs:[bx+12]
-@109@1654:
+@112@1654:
    ;	
    ;	   {
    ;	    case 27392: if (topWnd != (HWND)0) 
    ;	
 	cmp	dword ptr MGRP:topWnd,large 0
-	je	short @109@1906
+	je	short @112@1990
    ;	
    ;			 if (topWnd != protectedWnd)
    ;	
 	mov	eax,dword ptr MGRP:topWnd
 	cmp	eax,dword ptr MGRP:protectedWnd
-	je	short @109@1906
+	je	short @112@1990
    ;	
    ;			  DestroyWindow (topWnd); break;
    ;	
 	push	dword ptr MGRP:topWnd
 	call	near ptr MGRP:_DestroyWindow
 	add	sp,4
-	jmp	short @109@1906
-@109@1738:
+	jmp	short @112@1990
+@112@1738:
    ;	
    ;	    case  3711: quit = 1; break;
    ;	
 	mov	word ptr MGRP:_quit,1
-	jmp	short @109@1906
-@109@1766:
+	jmp	short @112@1990
+@112@1766:
    ;	
    ;	    case  3849: TurnControl (); break;
    ;	
 	call	near ptr MGRP:_TurnControl
-	jmp	short @109@1906
-@109@1794:
+	jmp	short @112@1990
+@112@1794:
    ;	
    ;	    case  3840: TurnWindow (); break;
    ;	
 	call	near ptr MGRP:_TurnWindow
-	jmp	short @109@1906
-@109@1822:
+	jmp	short @112@1990
+@112@1822:
    ;	
    ;	    case  7181: ExecuteControl (); break;
    ;	
 	call	near ptr MGRP:_ExecuteControl
-	jmp	short @109@1906
-@109@1850:
+	jmp	short @112@1990
+@112@1850:
    ;	
    ;	    case  7178: TickMenu (); break;
    ;	
 	call	near ptr MGRP:_TickMenu
-	jmp	short @109@1906
-@109@1878:
+	jmp	short @112@1990
+@112@1878:
    ;	
    ;	    default:
+   ;	         if (is_control)
    ;	
-   ;		     EditBoxPut ( (char) Xkey );
+	cmp	byte ptr [bp-1],0
+	je	short @112@1934
+   ;	
+   ;		        EditBoxPut ( (char) Xkey );
    ;	
 	mov	al,byte ptr MGRP:_Xkey
 	push	ax
 	call	near ptr MGRP:_EditBoxPut
 	pop	cx
+@112@1934:
+   ;	
+   ;		     
+   ;		     SysBuf.byte1 = KEYB_CLICK;
+   ;	
+	mov	byte ptr MGRP:_SysBuf+1,161
+   ;	
+   ;	         SysBuf.word1 = Xkey;
+   ;	
+	mov	ax,word ptr MGRP:_Xkey
+	mov	word ptr MGRP:_SysBuf+3,ax
+   ;	
+   ;	         //MessageBox("WinMain"); 
+   ;	         if ( (topWnd->WinMain != 0) ) (topWnd->WinMain) ();
+   ;	
+	les	bx,dword ptr MGRP:topWnd
+	cmp	dword ptr es:[bx+16],large 0
+	je	short @112@1990
+	call	dword ptr es:[bx+16]
+@112@1990:
+	cmp	word ptr MGRP:_quit,0
+	jne short	@@100
+	jmp	@112@58
+@@100:
    ;	
    ;	
    ;		     break;
-   ;	
-@109@1906:
-	cmp	word ptr MGRP:_quit,0
-	jne short	@@95
-	jmp	@109@58
-@@95:
-   ;	
    ;	   }
    ;	  }
    ;	 }
@@ -17568,7 +18125,7 @@ _WindowManager	proc	near
 	leave	
 	ret	
 _WindowManager	endp
-@109@C50	label	word
+@112@C50	label	word
 	db	127
 	db	14
 	db	0
@@ -17581,12 +18138,12 @@ _WindowManager	endp
 	db	28
 	db	0
 	db	107
-	dw	@109@1738
-	dw	@109@1794
-	dw	@109@1766
-	dw	@109@1850
-	dw	@109@1822
-	dw	@109@1654
+	dw	@112@1738
+	dw	@112@1794
+	dw	@112@1766
+	dw	@112@1850
+	dw	@112@1822
+	dw	@112@1654
    ;	
    ;	void intr (void* funcptr, char intc)
    ;	
@@ -17711,7 +18268,7 @@ _halt	proc	near
    ;	   pic ("/lib/shut.bmp",140);
    ;	
 	push	140
-	push	offset MGRP:s@+92
+	push	offset MGRP:s@+70
 	call	near ptr MGRP:_pic
 	add	sp,4
    ;	
@@ -17777,7 +18334,7 @@ _Int48	proc	far
    ;	 if (SysBuf.function == 0x01)
    ;	
 	cmp	byte ptr MGRP:_SysBuf,1
-	jne	short @113@142
+	jne	short @116@142
    ;	
    ;	 {
    ;	  memcpy (_CS,(unsigned int)TempString,SysBuf.word5,SysBuf.word6,49);
@@ -17804,13 +18361,13 @@ _Int48	proc	far
 	add	sp,12
 	mov	word ptr MGRP:_SysBuf+17,dx
 	mov	word ptr MGRP:_SysBuf+15,ax
-@113@142:
+@116@142:
    ;	
    ;	 }
    ;	 if (SysBuf.function == 0x02)
    ;	
 	cmp	byte ptr MGRP:_SysBuf,2
-	jne	short @113@198
+	jne	short @116@198
    ;	
    ;	   ((HWND)(SysBuf.dword1)) -> WinMain = (void far*)MakePtr (SysBuf.word3,SysBuf.word4);
    ;	
@@ -17824,12 +18381,12 @@ _Int48	proc	far
 	les	bx,dword ptr MGRP:_SysBuf+15
 	mov	word ptr es:[bx+18],dx
 	mov	word ptr es:[bx+16],ax
-@113@198:
+@116@198:
    ;	
    ;	 if (SysBuf.function == 0x03)
    ;	
 	cmp	byte ptr MGRP:_SysBuf,3
-	jne	short @113@254
+	jne	short @116@254
    ;	
    ;	  FarOutTextXY (SysBuf.word1+((HWND)(SysBuf.dword1))->x+5,((HWND)(SysBuf.dword1)) ->y+20+SysBuf.word2,
    ;	
@@ -17856,12 +18413,12 @@ _Int48	proc	far
 	push	ax
 	call	near ptr MGRP:_FarOutTextXY
 	add	sp,8
-@113@254:
+@116@254:
    ;	
    ;	 if (SysBuf.function == 0x04)
    ;	
 	cmp	byte ptr MGRP:_SysBuf,4
-	jne	short @113@310
+	jne	short @116@310
    ;	
    ;	  setFont (SysBuf.byte1);
    ;	
@@ -17870,12 +18427,12 @@ _Int48	proc	far
 	push	ax
 	call	near ptr MGRP:_setFont
 	pop	cx
-@113@310:
+@116@310:
    ;	
    ;	 if (SysBuf.function == 0x05)
    ;	
 	cmp	byte ptr MGRP:_SysBuf,5
-	jne	short @113@366
+	jne	short @116@366
    ;	
    ;	  SetColor (SysBuf.byte1);
    ;	
@@ -17884,23 +18441,23 @@ _Int48	proc	far
 	push	ax
 	call	near ptr MGRP:_SetColor
 	pop	cx
-@113@366:
+@116@366:
    ;	
    ;	 if (SysBuf.function == 0x06)
    ;	
 	cmp	byte ptr MGRP:_SysBuf,6
-	jne	short @113@422
+	jne	short @116@422
    ;	
    ;	  SysBuf.word1 = HiMemoryAvailable ();
    ;	
 	call	near ptr MGRP:_HiMemoryAvailable
 	mov	word ptr MGRP:_SysBuf+3,ax
-@113@422:
+@116@422:
    ;	
    ;	 if (SysBuf.function == 0x07)
    ;	
 	cmp	byte ptr MGRP:_SysBuf,7
-	jne	short @113@478
+	jne	short @116@478
    ;	
    ;	  SysBuf.dword1 = HiMemoryAlloc (SysBuf.dword1);
    ;	
@@ -17911,24 +18468,24 @@ _Int48	proc	far
 	pop	eax
 	add	sp,4
 	mov	dword ptr MGRP:_SysBuf+15,eax
-@113@478:
+@116@478:
    ;	
    ;	 if (SysBuf.function == 0x08)
    ;	
 	cmp	byte ptr MGRP:_SysBuf,8
-	jne	short @113@534
+	jne	short @116@534
    ;	
    ;	  HiMemoryFree (SysBuf.dword1);
    ;	
 	push	dword ptr MGRP:_SysBuf+15
 	call	near ptr MGRP:_HiMemoryFree
 	add	sp,4
-@113@534:
+@116@534:
    ;	
    ;	 if (SysBuf.function == 0x09)
    ;	
 	cmp	byte ptr MGRP:_SysBuf,9
-	jne	short @113@590
+	jne	short @116@590
    ;	
    ;	  (unsigned long)SysBuf.dword1 = CreateControl (SysBuf.word1,SysBuf.word2,
    ;	
@@ -17952,12 +18509,12 @@ _Int48	proc	far
 	add	sp,22
 	mov	word ptr MGRP:_SysBuf+17,dx
 	mov	word ptr MGRP:_SysBuf+15,ax
-@113@590:
+@116@590:
    ;	
    ;	 if (SysBuf.function == 0x10)
    ;	
 	cmp	byte ptr MGRP:_SysBuf,16
-	jne	short @113@646
+	jne	short @116@646
    ;	
    ;	  SysBuf.byte1 = popup (SysBuf.byte2,(char far** )MakePtr (SysBuf.word1,SysBuf.word2),
    ;	
@@ -17976,43 +18533,43 @@ _Int48	proc	far
 	call	near ptr MGRP:_popup
 	add	sp,10
 	mov	byte ptr MGRP:_SysBuf+1,al
-@113@646:
+@116@646:
    ;	
    ;	
    ;	 if (SysBuf.function == 0x11)
    ;	
 	cmp	byte ptr MGRP:_SysBuf,17
-	jne	short @113@702
+	jne	short @116@702
    ;	
    ;	  quit = 1;
    ;	
 	mov	word ptr MGRP:_quit,1
-@113@702:
+@116@702:
    ;	
    ;	 if (SysBuf.function == 0x12)
    ;	
 	cmp	byte ptr MGRP:_SysBuf,18
-	jne	short @113@758
+	jne	short @116@758
    ;	
    ;	  showmouse ();
    ;	
 	call	near ptr MGRP:_showmouse
-@113@758:
+@116@758:
    ;	
    ;	 if (SysBuf.function == 0x13)
    ;	
 	cmp	byte ptr MGRP:_SysBuf,19
-	jne	short @113@814
+	jne	short @116@814
    ;	
    ;	  hidemouse ();
    ;	
 	call	near ptr MGRP:_hidemouse
-@113@814:
+@116@814:
    ;	
    ;	 if (SysBuf.function == 0x14)
    ;	
 	cmp	byte ptr MGRP:_SysBuf,20
-	jne	short @113@870
+	jne	short @116@870
    ;	
    ;	  Bar (SysBuf.word1,SysBuf.word2,SysBuf.word3,SysBuf.word4);
    ;	
@@ -18020,12 +18577,12 @@ _Int48	proc	far
 	push	dword ptr MGRP:_SysBuf+3
 	call	near ptr MGRP:_Bar
 	add	sp,8
-@113@870:
+@116@870:
    ;	
    ;	 if (SysBuf.function == 0x15)
    ;	
 	cmp	byte ptr MGRP:_SysBuf,21
-	jne	short @113@926
+	jne	short @116@926
    ;	
    ;	  Rectangle (SysBuf.word1,SysBuf.word2,SysBuf.word3,SysBuf.word4);
    ;	
@@ -18033,22 +18590,22 @@ _Int48	proc	far
 	push	dword ptr MGRP:_SysBuf+3
 	call	near ptr MGRP:_Rectangle
 	add	sp,8
-@113@926:
+@116@926:
    ;	
    ;	 if (SysBuf.function == 0x16)
    ;	
 	cmp	byte ptr MGRP:_SysBuf,22
-	jne	short @113@982
+	jne	short @116@982
    ;	
    ;	  console ();
    ;	
 	call	near ptr MGRP:_console
-@113@982:
+@116@982:
    ;	
    ;	 if (SysBuf.function == 0x17)
    ;	
 	cmp	byte ptr MGRP:_SysBuf,23
-	jne	short @113@1038
+	jne	short @116@1038
    ;	
    ;	 {
    ;	  memcpy (_CS,(unsigned int)TempString,SysBuf.word5,SysBuf.word6,49);
@@ -18065,13 +18622,13 @@ _Int48	proc	far
 	push	offset MGRP:TempString
 	call	near ptr MGRP:_MessageBox
 	pop	cx
-@113@1038:
+@116@1038:
    ;	
    ;	 }
    ;	 if (SysBuf.function == 0x18)
    ;	
 	cmp	byte ptr MGRP:_SysBuf,24
-	jne	short @113@1094
+	jne	short @116@1094
    ;	
    ;	 {
    ;	  memcpy (_CS,(unsigned int)TempString,SysBuf.word5,SysBuf.word6,49);
@@ -18090,13 +18647,13 @@ _Int48	proc	far
 	push	offset MGRP:TempString
 	call	near ptr MGRP:_CommandTerm
 	add	sp,4
-@113@1094:
+@116@1094:
    ;	
    ;	 }
    ;	 if (SysBuf.function == 0x19)
    ;	
 	cmp	byte ptr MGRP:_SysBuf,25
-	jne	short @113@1150
+	jne	short @116@1150
    ;	
    ;	 {
    ;	  memcpy (_CS,(unsigned int)TempString,SysBuf.word5,SysBuf.word6,49);
@@ -18125,25 +18682,25 @@ _Int48	proc	far
 	push	ax
 	call	near ptr MGRP:_ShowIcon
 	add	sp,6
-@113@1150:
+@116@1150:
    ;	
    ;	 }
    ;	 if (SysBuf.function == 0x20)
    ;	
 	cmp	byte ptr MGRP:_SysBuf,32
-	jne	short @113@1206
+	jne	short @116@1206
    ;	
    ;	  DestroyWindow ( (HWND)SysBuf.dword1 );
    ;	
 	push	dword ptr MGRP:_SysBuf+15
 	call	near ptr MGRP:_DestroyWindow
 	add	sp,4
-@113@1206:
+@116@1206:
    ;	
    ;	 if (SysBuf.function == 0x21)
    ;	
 	cmp	byte ptr MGRP:_SysBuf,33
-	jne	short @113@1262
+	jne	short @116@1262
    ;	
    ;	 {
    ;	  ((CONTROL)(SysBuf.dword1))->size = SysBuf.word1;
@@ -18183,13 +18740,13 @@ _Int48	proc	far
 	push	word ptr es:[bx]
 	call	near ptr MGRP:_TextArea
 	add	sp,14
-@113@1262:
+@116@1262:
    ;	
    ;	 }
    ;	 if (SysBuf.function == 0x22)
    ;	
 	cmp	byte ptr MGRP:_SysBuf,34
-	jne	short @113@1318
+	jne	short @116@1318
    ;	
    ;	 {
    ;	  SysBuf.word1 = ((CONTROL)(SysBuf.dword1))->size;
@@ -18197,76 +18754,76 @@ _Int48	proc	far
 	les	bx,dword ptr MGRP:_SysBuf+15
 	mov	ax,word ptr es:[bx+18]
 	mov	word ptr MGRP:_SysBuf+3,ax
-@113@1318:
+@116@1318:
    ;	
    ;	 }
    ;	
    ;	 if (SysBuf.function == 0x23)
    ;	
 	cmp	byte ptr MGRP:_SysBuf,35
-	jne	short @113@1374
+	jne	short @116@1374
    ;	
    ;	 {
    ;	  protectedWnd = (HWND)SysBuf.dword1;
    ;	
 	mov	eax,dword ptr MGRP:_SysBuf+15
 	mov	dword ptr MGRP:protectedWnd,eax
-@113@1374:
+@116@1374:
    ;	
    ;	 }
    ;	 if (SysBuf.function == 0x24) InitFullApp ();
    ;	
 	cmp	byte ptr MGRP:_SysBuf,36
-	jne	short @113@1430
+	jne	short @116@1430
 	call	near ptr MGRP:_InitFullApp
-@113@1430:
+@116@1430:
    ;	
    ;	 if (SysBuf.function == 0x25) CloseFullApp ();
    ;	
 	cmp	byte ptr MGRP:_SysBuf,37
-	jne	short @113@1486
+	jne	short @116@1486
 	call	near ptr MGRP:_CloseFullApp
-@113@1486:
+@116@1486:
    ;	
    ;	 if (SysBuf.function == 0x26) console ();
    ;	
 	cmp	byte ptr MGRP:_SysBuf,38
-	jne	short @113@1542
+	jne	short @116@1542
 	call	near ptr MGRP:_console
-@113@1542:
+@116@1542:
    ;	
    ;	 if (SysBuf.function == 0x27) About ();
    ;	
 	cmp	byte ptr MGRP:_SysBuf,39
-	jne	short @113@1598
+	jne	short @116@1598
 	call	near ptr MGRP:_About
-@113@1598:
+@116@1598:
    ;	
    ;	 if (SysBuf.function == 0x28) halt();
    ;	
 	cmp	byte ptr MGRP:_SysBuf,40
-	jne	short @113@1654
+	jne	short @116@1654
 	call	near ptr MGRP:_halt
-@113@1654:
+@116@1654:
    ;	
    ;	 if (SysBuf.function == 0x29) ShowMem ();
    ;	
 	cmp	byte ptr MGRP:_SysBuf,41
-	jne	short @113@1710
+	jne	short @116@1710
 	call	near ptr MGRP:_ShowMem
-@113@1710:
+@116@1710:
    ;	
    ;	 if (SysBuf.function == 0x30)
    ;	
 	cmp	byte ptr MGRP:_SysBuf,48
-	jne	short @113@1766
+	jne	short @116@1766
    ;	
    ;	 {
    ;	  SysBuf.byte1 = gmode ;
    ;	
 	mov	al,byte ptr MGRP:_gmode
 	mov	byte ptr MGRP:_SysBuf+1,al
-@113@1766:
+@116@1766:
    ;	
    ;	 }
    ;	
@@ -18372,17 +18929,17 @@ _About	proc	near
    ;	 i = (gmode == 1) ? 0 : 80;
    ;	
 	cmp	byte ptr MGRP:_gmode,1
-	jne	short @115@86
+	jne	short @118@86
 	xor	ax,ax
-	jmp	short @115@114
-@115@86:
+	jmp	short @118@114
+@118@86:
 	mov	ax,80
-@115@114:
+@118@114:
 	mov	si,ax
    ;	
    ;	 CreateWindow (160+i,50,320,220+14,3,"About");
    ;	
-	push	offset MGRP:s@+106
+	push	offset MGRP:s@+84
 	push	3
 	push	large 000EA0140h
 	push	50
@@ -18395,7 +18952,7 @@ _About	proc	near
    ;	 pic ("/qwin/logo.pic",50+10);
    ;	
 	push	60
-	push	offset MGRP:s@+112
+	push	offset MGRP:s@+90
 	call	near ptr MGRP:_pic
 	add	sp,4
    ;	
@@ -18422,7 +18979,7 @@ _About	proc	near
    ;	
    ;	 OutTextXY (170+8+i,abouty,"CPU:");
    ;	
-	push	offset MGRP:s@+127
+	push	offset MGRP:s@+105
 	push	260
 	mov	ax,si
 	add	ax,178
@@ -18432,7 +18989,7 @@ _About	proc	near
    ;	
    ;	 OutTextXY (170+100+i,abouty,"Kernel:");
    ;	
-	push	offset MGRP:s@+132
+	push	offset MGRP:s@+110
 	push	260
 	mov	ax,si
 	add	ax,270
@@ -18442,7 +18999,7 @@ _About	proc	near
    ;	
    ;	 OutTextXY (170+100+120+8+i,abouty,"Memory:");
    ;	
-	push	offset MGRP:s@+140
+	push	offset MGRP:s@+118
 	push	260
 	mov	ax,si
 	add	ax,398
@@ -18464,7 +19021,7 @@ _About	proc	near
    ;	
    ;	 OutTextXY (170+5*8+i,abouty," 86");
    ;	
-	push	offset MGRP:s@+148
+	push	offset MGRP:s@+126
 	push	260
 	mov	ax,si
 	add	ax,210
@@ -18474,7 +19031,7 @@ _About	proc	near
    ;	
    ;	 OutTextXY (170+100+7*8+8+i,abouty,"R0.5");
    ;	
-	push	offset MGRP:s@+152
+	push	offset MGRP:s@+130
 	push	260
 	mov	ax,si
 	add	ax,334
@@ -18571,14 +19128,14 @@ _VideoLock	proc	near
 	push	1
 	call	near ptr MGRP:_SetVideo
 	pop	cx
-@116@30:
+@119@30:
    ;	
    ;	 while ( !is_key () ) ;
    ;	
 	call	near ptr MGRP:_is_key
 	mov	ah,0
 	or	ax,ax
-	je	short @116@30
+	je	short @119@30
    ;	
    ;	 SetVideo (ON);
    ;	
@@ -18606,17 +19163,17 @@ _CommandTerm	proc	near
    ;	 if (scr != 1) WriteKey ('@');
    ;	
 	cmp	byte ptr [bp+6],1
-	je	short @117@86
+	je	short @120@86
 	push	64
 	call	near ptr MGRP:_WriteKey
 	pop	cx
-@117@86:
+@120@86:
    ;	
    ;	 for (i = 0; tcmd[i] != 0; i++)
    ;	
 	xor	si,si
-	jmp	short @117@170
-@117@114:
+	jmp	short @120@170
+@120@114:
    ;	
    ;	  WriteKey (tcmd[i]);
    ;	
@@ -18626,10 +19183,10 @@ _CommandTerm	proc	near
 	call	near ptr MGRP:_WriteKey
 	pop	cx
 	inc	si
-@117@170:
+@120@170:
 	mov	bx,si
 	cmp	byte ptr [bx+di],0
-	jne	short @117@114
+	jne	short @120@114
    ;	
    ;	 WriteKey ('\r');
    ;	
@@ -18768,8 +19325,8 @@ _fgets	proc	near
    ;	  for (i=0; (peekchar (file_offset+i) != 13) && (peekchar (file_offset+i) != 0);i++) s[i] = peekchar (file_offset+i);
    ;	
 	xor	si,si
-	jmp	short @120@114
-@120@58:
+	jmp	short @123@114
+@123@58:
 	mov	ax,word ptr MGRP:_file_offset
 	add	ax,si
 	push	ax
@@ -18778,22 +19335,22 @@ _fgets	proc	near
 	mov	bx,si
 	mov	byte ptr [bx+di],al
 	inc	si
-@120@114:
+@123@114:
 	mov	ax,word ptr MGRP:_file_offset
 	add	ax,si
 	push	ax
 	call	near ptr MGRP:_peekchar
 	pop	cx
 	cmp	al,13
-	je	short @120@170
+	je	short @123@170
 	mov	ax,word ptr MGRP:_file_offset
 	add	ax,si
 	push	ax
 	call	near ptr MGRP:_peekchar
 	pop	cx
 	or	al,al
-	jne	short @120@58
-@120@170:
+	jne	short @123@58
+@123@170:
    ;	
    ;	  if (peekchar (file_offset+i) == 0) return 0;
    ;	
@@ -18803,10 +19360,10 @@ _fgets	proc	near
 	call	near ptr MGRP:_peekchar
 	pop	cx
 	or	al,al
-	jne	short @120@226
+	jne	short @123@226
 	xor	ax,ax
-	jmp	short @120@254
-@120@226:
+	jmp	short @123@254
+@123@226:
    ;	
    ;	  s[i] = 0;
    ;	
@@ -18822,7 +19379,7 @@ _fgets	proc	near
    ;	  return 1;
    ;	
 	mov	ax,1
-@120@254:
+@123@254:
    ;	
    ;	 }
    ;	
@@ -18860,9 +19417,9 @@ _script	proc	near
    ;	  if (bfile < 2) return;
    ;	
 	cmp	dword ptr [bp-4],large 2
-	jae short	@@96
-	jmp	@121@450
-@@96:
+	jae short	@@101
+	jmp	@124@450
+@@101:
    ;	
    ;	  bufferbatch = malloc ( (fsize (bfile) / 16) + 1);
    ;	
@@ -18882,9 +19439,9 @@ _script	proc	near
    ;	  if (!bufferbatch) return;
    ;	
 	cmp	word ptr MGRP:bufferbatch,0
-	jne short	@@97
-	jmp	@121@450
-@@97:
+	jne short	@@102
+	jmp	@124@450
+@@102:
    ;	
    ;	  counter = 0;
    ;	
@@ -18920,8 +19477,8 @@ _script	proc	near
 	shld	edx,eax,16
 	mov	word ptr MGRP:_rcCmd+2,dx
 	mov	word ptr MGRP:_rcCmd,ax
-	jmp	short @121@254
-@121@114:
+	jmp	short @124@254
+@124@114:
    ;	
    ;	
    ;	  for ( ; ScanFile != '!' ; file_offset++)
@@ -18936,17 +19493,17 @@ _script	proc	near
    ;	   if (ScanFile == 13) putchar (file_offset,32);
    ;	
 	cmp	byte ptr [bp-5],13
-	jne	short @121@170
+	jne	short @124@170
 	push	32
 	push	word ptr MGRP:_file_offset
 	call	near ptr MGRP:_putchar
 	add	sp,4
-@121@170:
+@124@170:
    ;	
    ;	   if (ScanFile == 10)
    ;	
 	cmp	byte ptr [bp-5],10
-	jne	short @121@226
+	jne	short @124@226
    ;	
    ;	   {
    ;	    putchar (file_offset,0);
@@ -18976,11 +19533,11 @@ _script	proc	near
 	shl	bx,2
 	mov	word ptr MGRP:_rcCmd[bx+2],dx
 	mov	word ptr MGRP:_rcCmd[bx],ax
-@121@226:
+@124@226:
 	inc	word ptr MGRP:_file_offset
-@121@254:
+@124@254:
 	cmp	byte ptr [bp-5],33
-	jne	short @121@114
+	jne	short @124@114
    ;	
    ;	   }
    ;	  }
@@ -18998,17 +19555,17 @@ _script	proc	near
    ;	  if (result == 0)
    ;	
 	or	si,si
-	jne	short @121@338
+	jne	short @124@338
    ;	
    ;	  {
    ;	   strcpy (cmdsh,"$");
    ;	
-	push	offset MGRP:s@+157
+	push	offset MGRP:s@+135
 	push	offset MGRP:_cmdsh
 	call	near ptr MGRP:_strcpy
 	add	sp,4
-	jmp	short @121@422
-@121@338:
+	jmp	short @124@422
+@124@338:
    ;	
    ;	   free (bufferbatch);
    ;	   return cmdsh;
@@ -19016,8 +19573,8 @@ _script	proc	near
    ;	  file_offset += 2;
    ;	
 	add	word ptr MGRP:_file_offset,2
-	jmp	short @121@394
-@121@366:
+	jmp	short @124@394
+@124@366:
    ;	
    ;	
    ;	  while ( result != 0)
@@ -19031,10 +19588,10 @@ _script	proc	near
    ;	   result--;
    ;	
 	dec	si
-@121@394:
+@124@394:
 	or	si,si
-	jne	short @121@366
-@121@422:
+	jne	short @124@366
+@124@422:
    ;	
    ;	  }
    ;	
@@ -19047,7 +19604,7 @@ _script	proc	near
    ;	  return cmdsh;
    ;	
 	mov	ax,offset MGRP:_cmdsh
-@121@450:
+@124@450:
    ;	
    ;	 }
    ;	
@@ -19094,9 +19651,11 @@ _FullScreenShell	proc	near
 	mov	word ptr MGRP:_shell+2,dx
 	mov	word ptr MGRP:_shell,ax
    ;	
-   ;	 shell ();
+   ;	 shell ((char)0);
    ;	
+	push	0
 	call	dword ptr MGRP:_shell
+	pop	cx
    ;	
    ;	 _DS = _CS;
    ;	
@@ -19106,19 +19665,19 @@ _FullScreenShell	proc	near
    ;	 if (gmode == 1)
    ;	
 	cmp	byte ptr MGRP:_gmode,1
-	jne	short @122@226
+	jne	short @125@226
    ;	
    ;	  init640480 ();
    ;	
 	call	near ptr MGRP:_init640480
-	jmp	short @122@254
-@122@226:
+	jmp	short @125@254
+@125@226:
    ;	
    ;	 else
    ;	  init800600 ();
    ;	
 	call	near ptr MGRP:_init800600
-@122@254:
+@125@254:
    ;	
    ;	 SetRGB (1,Pal[0],Pal[1],Pal[2]);
    ;	
@@ -19190,15 +19749,15 @@ _TickMenu	proc	near
    ;	 if (is_full_app) return;
    ;	
 	cmp	byte ptr MGRP:is_full_app,0
-	je short	@@98
-	jmp	@123@870
-@@98:
+	je short	@@103
+	jmp	@126@870
+@@103:
    ;	
    ;	
    ;	 strcpy (fileS,"/etc/qwin.rc");
    ;	
-	push	offset MGRP:s@+159
-@123@58:
+	push	offset MGRP:s@+137
+@126@58:
 	push	offset MGRP:_fileS
 	call	near ptr MGRP:_strcpy
 	add	sp,4
@@ -19218,61 +19777,114 @@ _TickMenu	proc	near
    ;	 if (resultS [0] == '$') return;
    ;	
 	cmp	byte ptr MGRP:_resultS,36
-	jne short	@@99
-	jmp	@123@870
-@@99:
+	jne short	@@104
+	jmp	@126@870
+@@104:
    ;	
    ;	 if (resultS [0] == '@') exec (resultS+1,0,0);
    ;	
 	cmp	byte ptr MGRP:_resultS,64
-	jne	short @123@170
+	jne	short @126@170
 	push	large 0
 	push	offset MGRP:_resultS+1
 	call	near ptr MGRP:_exec
 	add	sp,6
-@123@170:
+@126@170:
    ;	
    ;	 if (resultS [0] == '*') CommandTerm (resultS+1,0);
    ;	
 	cmp	byte ptr MGRP:_resultS,42
-	jne	short @123@226
+	jne	short @126@226
 	push	0
 	push	offset MGRP:_resultS+1
 	call	near ptr MGRP:_CommandTerm
 	add	sp,4
-@123@226:
+@126@226:
    ;	
    ;	 if (resultS [0] == '~') CommandTerm (resultS+1,1);
    ;	
 	cmp	byte ptr MGRP:_resultS,126
-	jne	short @123@282
+	jne	short @126@282
 	push	1
 	push	offset MGRP:_resultS+1
 	call	near ptr MGRP:_CommandTerm
 	add	sp,4
-@123@282:
+@126@282:
    ;	
    ;	 if (resultS [0] == '&')
    ;	
 	cmp	byte ptr MGRP:_resultS,38
-	je short	@@100
-	jmp	@123@814
-@@100:
+	je short	@@105
+	jmp	@126@814
+@@105:
    ;	
    ;	 {
    ;	  if (!strcmp (resultS+1,"quit")) quit = 1;
    ;	
-	push	offset MGRP:s@+172
+	push	offset MGRP:s@+150
 	push	offset MGRP:_resultS+1
 	call	near ptr MGRP:_strcmp
 	add	sp,4
 	mov	ah,0
 	or	ax,ax
-	jne	short @123@366
+	jne	short @126@366
 	mov	word ptr MGRP:_quit,1
-@123@366:
+@126@366:
    ;	
    ;	  if (!strcmp (resultS+1,"clean")) DestroyAllWindows ();
+   ;	
+	push	offset MGRP:s@+155
+	push	offset MGRP:_resultS+1
+	call	near ptr MGRP:_strcmp
+	add	sp,4
+	mov	ah,0
+	or	ax,ax
+	jne	short @126@422
+	call	near ptr MGRP:_DestroyAllWindows
+@126@422:
+   ;	
+   ;	  if (!strcmp (resultS+1,"halt"))
+   ;	
+	push	offset MGRP:s@+161
+	push	offset MGRP:_resultS+1
+	call	near ptr MGRP:_strcmp
+	add	sp,4
+	mov	ah,0
+	or	ax,ax
+	jne	short @126@478
+   ;	
+   ;	  {
+   ;	    halt ();
+   ;	
+	call	near ptr MGRP:_halt
+@126@478:
+   ;	
+   ;	  }
+   ;	  if (!strcmp (resultS+1,"term")) console ();
+   ;	
+	push	offset MGRP:s@+166
+	push	offset MGRP:_resultS+1
+	call	near ptr MGRP:_strcmp
+	add	sp,4
+	mov	ah,0
+	or	ax,ax
+	jne	short @126@534
+	call	near ptr MGRP:_console
+@126@534:
+   ;	
+   ;	  if (!strcmp (resultS+1,"fterm")) FullScreenShell ();
+   ;	
+	push	offset MGRP:s@+171
+	push	offset MGRP:_resultS+1
+	call	near ptr MGRP:_strcmp
+	add	sp,4
+	mov	ah,0
+	or	ax,ax
+	jne	short @126@590
+	call	near ptr MGRP:_FullScreenShell
+@126@590:
+   ;	
+   ;	  if (!strcmp (resultS+1,"vlock")) VideoLock ();
    ;	
 	push	offset MGRP:s@+177
 	push	offset MGRP:_resultS+1
@@ -19280,11 +19892,11 @@ _TickMenu	proc	near
 	add	sp,4
 	mov	ah,0
 	or	ax,ax
-	jne	short @123@422
-	call	near ptr MGRP:_DestroyAllWindows
-@123@422:
+	jne	short @126@646
+	call	near ptr MGRP:_VideoLock
+@126@646:
    ;	
-   ;	  if (!strcmp (resultS+1,"halt"))
+   ;	  if (!strcmp (resultS+1,"reboot")) reboot ();
    ;	
 	push	offset MGRP:s@+183
 	push	offset MGRP:_resultS+1
@@ -19292,95 +19904,42 @@ _TickMenu	proc	near
 	add	sp,4
 	mov	ah,0
 	or	ax,ax
-	jne	short @123@478
-   ;	
-   ;	  {
-   ;	    halt ();
-   ;	
-	call	near ptr MGRP:_halt
-@123@478:
-   ;	
-   ;	  }
-   ;	  if (!strcmp (resultS+1,"term")) console ();
-   ;	
-	push	offset MGRP:s@+188
-	push	offset MGRP:_resultS+1
-	call	near ptr MGRP:_strcmp
-	add	sp,4
-	mov	ah,0
-	or	ax,ax
-	jne	short @123@534
-	call	near ptr MGRP:_console
-@123@534:
-   ;	
-   ;	  if (!strcmp (resultS+1,"fterm")) FullScreenShell ();
-   ;	
-	push	offset MGRP:s@+193
-	push	offset MGRP:_resultS+1
-	call	near ptr MGRP:_strcmp
-	add	sp,4
-	mov	ah,0
-	or	ax,ax
-	jne	short @123@590
-	call	near ptr MGRP:_FullScreenShell
-@123@590:
-   ;	
-   ;	  if (!strcmp (resultS+1,"vlock")) VideoLock ();
-   ;	
-	push	offset MGRP:s@+199
-	push	offset MGRP:_resultS+1
-	call	near ptr MGRP:_strcmp
-	add	sp,4
-	mov	ah,0
-	or	ax,ax
-	jne	short @123@646
-	call	near ptr MGRP:_VideoLock
-@123@646:
-   ;	
-   ;	  if (!strcmp (resultS+1,"reboot")) reboot ();
-   ;	
-	push	offset MGRP:s@+205
-	push	offset MGRP:_resultS+1
-	call	near ptr MGRP:_strcmp
-	add	sp,4
-	mov	ah,0
-	or	ax,ax
-	jne	short @123@702
+	jne	short @126@702
 	call	dword ptr MGRP:_reboot
-@123@702:
+@126@702:
    ;	
    ;	  if (!strcmp (resultS+1,"about")) About ();
    ;	
-	push	offset MGRP:s@+212
+	push	offset MGRP:s@+190
 	push	offset MGRP:_resultS+1
 	call	near ptr MGRP:_strcmp
 	add	sp,4
 	mov	ah,0
 	or	ax,ax
-	jne	short @123@758
+	jne	short @126@758
 	call	near ptr MGRP:_About
-@123@758:
+@126@758:
    ;	
    ;	  if (!strcmp (resultS+1,"mem")) ShowMem ();
    ;	
-	push	offset MGRP:s@+218
+	push	offset MGRP:s@+196
 	push	offset MGRP:_resultS+1
 	call	near ptr MGRP:_strcmp
 	add	sp,4
 	mov	ah,0
 	or	ax,ax
-	jne	short @123@814
+	jne	short @126@814
 	call	near ptr MGRP:_ShowMem
-@123@814:
+@126@814:
    ;	
    ;	 }
    ;	 if (resultS [0] == '#') { strcpy (fileS,resultS+1); goto OtherMenu; }
    ;	
 	cmp	byte ptr MGRP:_resultS,35
-	jne	short @123@870
+	jne	short @126@870
 	push	offset MGRP:_resultS+1
-	jmp	@123@58
-@123@870:
+	jmp	@126@58
+@126@870:
    ;	
    ;	}
    ;	
@@ -19483,19 +20042,19 @@ _StartProgram	proc	near
    ;	  if (gmode == 1)
    ;	
 	cmp	byte ptr MGRP:_gmode,1
-	jne	short @126@198
+	jne	short @129@198
    ;	
    ;	   init640480 ();
    ;	
 	call	near ptr MGRP:_init640480
-	jmp	short @126@226
-@126@198:
+	jmp	short @129@226
+@129@198:
    ;	
    ;	  else 
    ;	   init800600 ();
    ;	
 	call	near ptr MGRP:_init800600
-@126@226:
+@129@226:
    ;	
    ;	
    ;	// pic ("/qwin/boot.fig",140);
@@ -19509,7 +20068,7 @@ _StartProgram	proc	near
    ;	
    ;	 fntfile = fopen ("/lib/fnt/breeze.fnt");
    ;	
-	push	offset MGRP:s@+222
+	push	offset MGRP:s@+200
 	call	near ptr MGRP:_fopen
 	push	dx
 	push	ax
@@ -19528,7 +20087,7 @@ _StartProgram	proc	near
    ;	
    ;	 fntfile = fopen ("/lib/fnt/modern.fnt");
    ;	
-	push	offset MGRP:s@+242
+	push	offset MGRP:s@+220
 	call	near ptr MGRP:_fopen
 	push	dx
 	push	ax
@@ -19547,7 +20106,7 @@ _StartProgram	proc	near
    ;	
    ;	 fntfile = fopen ("/lib/fnt/roman.fnt");
    ;	
-	push	offset MGRP:s@+262
+	push	offset MGRP:s@+240
 	call	near ptr MGRP:_fopen
 	push	dx
 	push	ax
@@ -19566,7 +20125,7 @@ _StartProgram	proc	near
    ;	
    ;	 palfile = fopen ("/qwin/win.pal");
    ;	
-	push	offset MGRP:s@+281
+	push	offset MGRP:s@+259
 	call	near ptr MGRP:_fopen
 	push	dx
 	push	ax
@@ -19669,7 +20228,7 @@ _StartProgram	proc	near
    ;	 
    ;	 palfile = fopen ("/qwin/qwin.ini");
    ;	
-	push	offset MGRP:s@+295
+	push	offset MGRP:s@+273
 	call	near ptr MGRP:_fopen
 	push	dx
 	push	ax
@@ -19680,9 +20239,9 @@ _StartProgram	proc	near
    ;	 if (palfile < 2) return;
    ;	
 	cmp	dword ptr MGRP:_palfile,large 2
-	jae short	@@101
-	jmp	@126@842
-@@101:
+	jae short	@@106
+	jmp	@129@842
+@@106:
    ;	
    ;	 bufferbatch = malloc ( (fsize (palfile) / 16) + 1);
    ;	
@@ -19702,9 +20261,9 @@ _StartProgram	proc	near
    ;	 if (!bufferbatch) return;
    ;	
 	cmp	word ptr MGRP:bufferbatch,0
-	jne short	@@102
-	jmp	@126@842
-@@102:
+	jne short	@@107
+	jmp	@129@842
+@@107:
    ;	
    ;	 fread (palfile,fsize (palfile),0,bufferbatch);
    ;	
@@ -19727,8 +20286,8 @@ _StartProgram	proc	near
    ;	 cmdsh [0] = '\0' ;
    ;	
 	mov	byte ptr MGRP:_cmdsh,0
-	jmp	short @126@338
-@126@310:
+	jmp	short @129@338
+@129@310:
    ;	
    ;	
    ;	 while (cmdsh [0] != '>' )
@@ -19745,9 +20304,9 @@ _StartProgram	proc	near
 	push	offset MGRP:_cmdsh
 	call	near ptr MGRP:_exec
 	add	sp,6
-@126@338:
+@129@338:
 	cmp	byte ptr MGRP:_cmdsh,62
-	jne	short @126@310
+	jne	short @129@310
    ;	
    ;	 }
    ;	 
@@ -19773,7 +20332,7 @@ _StartProgram	proc	near
    ;	
 	call	near ptr MGRP:_ismouse
 	cmp	ax,00000FFFFh
-	jne	short @126@506
+	jne	short @129@506
    ;	
    ;	 {
    ;	  mouse_status = 1;
@@ -19783,22 +20342,22 @@ _StartProgram	proc	near
    ;	  if (gmode == 1)
    ;	
 	cmp	byte ptr MGRP:_gmode,1
-	jne	short @126@450
+	jne	short @129@450
    ;	
    ;	   init_mouse (640,480);
    ;	
 	push	large 001E00280h
-	jmp	short @126@478
-@126@450:
+	jmp	short @129@478
+@129@450:
    ;	
    ;	  else
    ;	  init_mouse (800,600);
    ;	
 	push	large 002580320h
-@126@478:
+@129@478:
 	call	near ptr MGRP:_init_mouse
 	add	sp,4
-@126@506:
+@129@506:
    ;	
    ;	 }
    ;	
@@ -19837,9 +20396,9 @@ _StartProgram	proc	near
    ;	
 	call	near ptr MGRP:_ismouse
 	cmp	ax,00000FFFFh
-	jne	short @126@562
+	jne	short @129@562
 	call	near ptr MGRP:_shut_mouse
-@126@562:
+@129@562:
    ;	
    ;	
    ;	 asm {
@@ -19903,7 +20462,7 @@ _StartProgram	proc	near
 	push	cs
 	call	near ptr MGRP:_free
 	pop	cx
-@126@842:
+@129@842:
    ;	
    ;	}
    ;	
@@ -19979,6 +20538,18 @@ _screen_seg1	label	word
 	db	4 dup (0)
 is_full_app	label	byte
 	db	1 dup (0)
+_keysh	label	word
+	db	2 dup (0)
+_shell	label	dword
+	db	4 dup (0)
+DataSegmentSh	label	word
+	db	2 dup (0)
+_shc	label	byte
+	db	1 dup (0)
+_delta	label	word
+	db	2 dup (0)
+_hWndSh	label	dword
+	db	4 dup (0)
 tempControl	label	dword
 	db	4 dup (0)
 dumControl	label	dword
@@ -20009,10 +20580,6 @@ my	label	word
 	db	2 dup (0)
 mx	label	word
 	db	2 dup (0)
-_shell	label	dword
-	db	4 dup (0)
-_shc	label	byte
-	db	1 dup (0)
 BlockSize	label	word
 	db	4 dup (0)
 Xflag	label	byte
@@ -20021,6 +20588,8 @@ TempSize	label	word
 	db	4 dup (0)
 HiMemoryUsed	label	word
 	db	4 dup (0)
+_deltaw	label	word
+	db	2 dup (0)
 TempString	label	byte
 	db	50 dup (0)
 _font_mem	label	word
@@ -20030,13 +20599,11 @@ _backc	label	word
 	?debug	C E9
 	?debug	C FA10010000
 s@	label	byte
-	db	'CreateWindow ()... Failed'
-	db	0
 	db	'ERROR HIMEM'
 	db	0
-	db	'terminal'
+	db	'Shell'
 	db	0
-	db	'Desktop'
+	db	'Window too big'
 	db	0
 	db	'Memory Usage'
 	db	0
@@ -20113,7 +20680,6 @@ _bufferbatch	equ	bufferbatch
 	public	_GetProc
 	public	_Int48
 _DataSegment	equ	DataSegment
-	public	_halt
 	public	_MakePtr
 	public	_intr
 	public	_WindowManager
@@ -20163,12 +20729,9 @@ _MouseB	equ	MouseB
 _MouseY	equ	MouseY
 _MouseX	equ	MouseX
 	public	_TurnWindow
-	public	_SwitchWindow
 	public	_DestroyAllWindows
-	public	_DestroyWindow
 	public	_DestroyControl
 	public	_NextWindow
-	public	_CreateWindow
 _TempString2	equ	TempString2
 _dumWnd	equ	dumWnd
 	public	_CloseFullApp
@@ -20179,6 +20742,30 @@ _dumWnd	equ	dumWnd
 	public	_screen_seg2
 	public	_screen_seg1
 _is_full_app	equ	is_full_app
+	public	_console
+	public	_WinMainSh
+	public	_keysh
+	public	_shell
+_DataSegmentSh	equ	DataSegmentSh
+	public	_set_int_29
+	public	_int29
+	public	_exiting
+	public	_shc
+	public	_delta
+	public	_wy
+	public	_wx
+	public	_iy
+	public	_ix
+	public	_shY
+	public	_shX
+	public	_get_shell
+	public	_hWndSh
+	public	_SwitchWindow
+	public	_DestroyWindow
+	public	_CreateWindow
+	public	_displayChar
+	public	_restore_area
+	public	_save_area
 _tempControl	equ	tempControl
 _dumControl	equ	dumControl
 	public	_activeButton
@@ -20211,16 +20798,6 @@ _mx	equ	mx
 	public	_avail
 	public	_free
 	public	_malloc
-	public	_console
-	public	_shell
-	public	_set_int_29
-	public	_int29
-	public	_shc
-	public	_shY
-	public	_shX
-	public	_get_shell
-	public	_restore_area
-	public	_save_area
 	public	_HiMemoryInit
 	public	_HiMemoryFree
 	public	_HiMemoryAlloc
@@ -20247,7 +20824,6 @@ _HiMemoryUsed	equ	HiMemoryUsed
 	public	_Window1
 _BGWindow	equ	BGWindow
 	public	_FarOutTextXY
-	public	_OutTextXY
 	public	_XORRectangle
 	public	_Rectangle
 	public	_SetColor
@@ -20262,6 +20838,8 @@ _BGWindow	equ	BGWindow
 	public	_putimage2
 	public	_getimage2
 	public	_imagesize
+	public	_writenum
+	public	_deltaw
 	public	_abs
 	public	_setFont
 	public	_getOfs
@@ -20275,6 +20853,7 @@ _BGWindow	equ	BGWindow
 	public	_getpix
 	public	_setpix
 	public	_COLOR
+	public	_OutTextXY
 	extrn	_waitretrace:near
 	extrn	_barasm2:near
 	extrn	_barasm1:near
@@ -20295,6 +20874,7 @@ _TempString	equ	TempString
 	public	_backc
 	public	_isFont
 	public	_bmouse
+	public	_halt
 	public	_About
 	public	_CommandTerm
 	public	_FullScreenShell

@@ -15,7 +15,7 @@ $comm	macro	name,dist,size,count
 	endif
 	?debug	V 300h
 	?debug	S "sh.c"
-	?debug	C E9F94CBF580473682E63
+	?debug	C E9F27DEF580473682E63
 	?debug	C E9E34B5357132E5C494E434C5544455C737461727475702E68
 VPSEG	segment byte public use16 
 VPSEG	ends
@@ -376,7 +376,7 @@ _avail	proc	near
    ;	
 	ret	
 _avail	endp
-	?debug	C E9B151BF58102E5C494E434C5544455C66696C652E68
+	?debug	C E9F278E458102E5C494E434C5544455C66696C652E68
    ;	
    ;	 handle fopen (char* fname)
    ;	
@@ -905,6 +905,7 @@ _exec	proc	near
 	pop	      ds
    ;	
    ;	      }
+   ;	      
    ;	 if  ( (!is_xsh()) && (check) && (avail() != tm) ) puts ("\n\rwarning: memory no released");
    ;	
 	call	near ptr MGRP:_is_xsh
@@ -924,6 +925,7 @@ _exec	proc	near
 	pop	cx
 @18@562:
    ;	
+   ;	 
    ;	 }
    ;	
 	pop	si
@@ -6049,28 +6051,66 @@ _batch	proc	near
 	ret	
 _batch	endp
    ;	
-   ;	 void far shell (void)
+   ;	 int far shell (char first)
    ;	
 	assume	cs:MGRP
 _shell	proc	far
+	push	bp
+	mov	bp,sp
    ;	
    ;	 {
    ;	  _DS = _CS;
    ;	
 	mov	ax,cs
 	mov	ds,ax
-@61@30:
+@61@58:
    ;	
    ;	
    ;	  while (1)
    ;	  {
-   ;	   puts (nl);
+   ;	   
+   ;	   memset (_CS,(uint)cmdsh,100,0);
+   ;	
+	push	0
+	push	100
+	push	offset MGRP:_cmdsh
+	push	cs
+	call	near ptr MGRP:_memset
+	add	sp,8
+   ;	
+   ;	   
+   ;	   if (first > (char)2)
+   ;	
+	cmp	byte ptr [bp+6],2
+	jle	short @61@114
+   ;	
+   ;	   {
+   ;	             cputc(first, 7);
+   ;	
+	push	7
+	mov	al,byte ptr [bp+6]
+	push	ax
+	call	near ptr MGRP:_cputc
+	add	sp,4
+   ;	
+   ;	             cmdsh[0] = first;  
+   ;	
+	mov	al,byte ptr [bp+6]
+	mov	byte ptr MGRP:_cmdsh,al
+	jmp	short @61@170
+@61@114:
+   ;	
+   ;	             gets (cmdsh, 100);
+   ;	   } 
+   ;	   else
+   ;	   {
+   ;	       puts (nl);
    ;	
 	push	offset MGRP:nl
 	call	near ptr MGRP:_puts
 	pop	cx
    ;	
-   ;	   cputc (usedrive,7); cputc (':',7);cputs (prompt,7); cputc ('>',7);
+   ;	       cputc (usedrive,7); cputc (':',7);cputs (prompt,7); cputc ('>',7);
    ;	
 	push	7
 	mov	al,byte ptr MGRP:_usedrive
@@ -6090,22 +6130,24 @@ _shell	proc	far
 	call	near ptr MGRP:_cputc
 	add	sp,4
    ;	
-   ;	   memset (_CS,(uint)cmdsh,100,0);
+   ;	       if (first == (char)2) return 0;
    ;	
-	push	0
-	push	100
-	push	offset MGRP:_cmdsh
-	push	cs
-	call	near ptr MGRP:_memset
-	add	sp,8
+	cmp	byte ptr [bp+6],2
+	jne	short @61@170
+@61@142:
+	xor	ax,ax
+	jmp	@61@646
+@61@170:
    ;	
-   ;	   gets (cmdsh,100);
+   ;	       gets (cmdsh,100);
    ;	
 	push	100
 	push	offset MGRP:_cmdsh
 	call	near ptr MGRP:_gets
 	add	sp,4
    ;	
+   ;	   }
+   ;	   
    ;	   memset (_CS,(uint)buf,100,0);
    ;	
 	push	0
@@ -6135,13 +6177,13 @@ _shell	proc	far
 	add	sp,4
 	mov	ah,0
 	or	ax,ax
-	jne	short @61@114
+	jne	short @61@282
 	push	offset MGRP:s@+427
-@61@86:
+@61@254:
 	call	near ptr MGRP:_batch
 	pop	cx
-	jmp	short @61@254
-@61@114:
+	jmp	short @61@422
+@61@282:
    ;	
    ;	   else if ( ((string)get_argz(cmdsh,1))[0] == '$') batch ( (string)get_argz(cmdsh,1)+1);
    ;	
@@ -6151,15 +6193,15 @@ _shell	proc	far
 	add	sp,4
 	mov	bx,ax
 	cmp	byte ptr [bx],36
-	jne	short @61@170
+	jne	short @61@338
 	push	1
 	push	offset MGRP:_cmdsh
 	call	near ptr MGRP:_get_argz
 	add	sp,4
 	inc	ax
 	push	ax
-	jmp	short @61@86
-@61@170:
+	jmp	short @61@254
+@61@338:
    ;	
    ;	   else if ( ((string)get_argz(cmdsh,1))[0] == '@')
    ;	
@@ -6169,7 +6211,7 @@ _shell	proc	far
 	add	sp,4
 	mov	bx,ax
 	cmp	byte ptr [bx],64
-	jne	short @61@226
+	jne	short @61@394
    ;	
    ;	   {
    ;	    doCmd (cmdsh+1);
@@ -6184,8 +6226,8 @@ _shell	proc	far
    ;	
    ;	   }
    ;	
-	jmp	short @61@254
-@61@226:
+	jmp	short @61@422
+@61@394:
    ;	
    ;	   else {
    ;		   doCmd (cmdsh);
@@ -6198,23 +6240,69 @@ _shell	proc	far
    ;	
 	mov	ax,cs
 	mov	ds,ax
-@61@254:
+@61@422:
    ;	
    ;	        }
-   ;	   if (quit) break;
+   ;	
+   ;	   if (is_xsh()) 
+   ;	
+	call	near ptr MGRP:_is_xsh
+	or	al,al
+	je	short @61@590
+   ;	
+   ;	   {
+   ;	      if (quit) 
    ;	
 	cmp	word ptr MGRP:_quit,0
 	jne short	@@36
-	jmp	@61@30
+	jmp	@61@142
 @@36:
    ;	
+   ;	      {
+   ;	         asm {
+   ;	            mov al,1
+   ;	
+	mov	 al,1
+   ;	
+   ;	            int 0x29
+   ;	
+	int	 029H
+   ;	
+   ;	         }
+   ;	         quit = 0;
+   ;	
+	mov	word ptr MGRP:_quit,0
+   ;	
+   ;	         return 0;  
+   ;	
+	jmp	@61@142
+	jmp	@61@142
+@61@590:
+   ;	
+   ;	      }                     
+   ;	      //puts (nl);
+   ;	      //cputc (usedrive,7); cputc (':',7);cputs (prompt,7); cputc ('>',7);
+   ;	      return 0;
+   ;	      //break;
+   ;	   }
+   ;	      
+   ;	   if (quit) break;
+   ;	
+	cmp	word ptr MGRP:_quit,0
+	jne short	@@37
+	jmp	@61@58
+@@37:
+   ;	
+   ;	   
    ;	  }
    ;	 quit = 0;
    ;	
 	mov	word ptr MGRP:_quit,0
+@61@646:
    ;	
    ;	 }
    ;	
+	pop	bp
 	ret	
 _shell	endp
    ;	
@@ -6330,10 +6418,12 @@ _main	proc	near
 @62@478:
    ;	
    ;	
-   ;	  shell ();
+   ;	  shell ((char)0);
    ;	
+	push	0
 	push	cs
 	call	near ptr MGRP:_shell
+	pop	cx
    ;	
    ;	
    ;	 }

@@ -16,6 +16,14 @@ void ProgramEntry (void)
  asm { retf };
 }
 
+char is_xsh (void)
+{
+ asm {
+        mov ah,4
+        int 0x46
+     }
+}
+
 int isecho = 1;
 
 #include <stdout.h>
@@ -451,13 +459,7 @@ void printit (void)
  for (i=0; (TextGet (i) != 26); i++) printchar (TextGet(i));
 }
 
-char is_xsh (void)
-{
- asm {
-        mov ah,4
-        int 0x46
-     }
-}
+
 
 char argv[50];
 

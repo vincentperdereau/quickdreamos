@@ -7,6 +7,7 @@ void MessageBox (char*);
 void FullScreenShell (void);
 void CommandTerm (char*,char);
 void About (void);
+void halt (void);
 unsigned int bmouse (void);
 
 int isFont=0;
@@ -15,14 +16,25 @@ unsigned char gmode = 1;
 unsigned int font_mem;
 static char TempString [50];
 
+struct hWindow
+{
+ unsigned int x,y,w,h;
+ unsigned long form;
+ void far* prev;
+ void far (*WinMain)(void);
+ void far* FirstControl;
+ void far* LastControl;
+ void far* ActiveControl;
+};
+
+typedef struct hWindow far* HWND;
+
 #include "file.h"
 #include "graph.h"
 #include "himem.h"
 #include "scroll.h"
 #include "memory.h"
 #include "xmem.h"
-
-#include "shell.h"
 
 unsigned int malloc (int pg)
 {
@@ -42,11 +54,12 @@ void free (unsigned int segm)
       }
 }
 
-unsigned int avail (void)
+unsigned long avail (void)
 {
  asm {
        mov ah,0x15
        int 0x44
+       mov dx,0
       } 
 }
 
@@ -151,18 +164,7 @@ struct hControl
 
 typedef struct hControl far* CONTROL;
 
-struct hWindow
-{
- unsigned int x,y,w,h;
- unsigned long form;
- void far* prev;
- void far (*WinMain)(void);
- void far* FirstControl;
- void far* LastControl;
- void far* ActiveControl;
-};
 
-typedef struct hWindow far* HWND;
 
 struct SystemBuffer {
 unsigned char function;
@@ -194,13 +196,17 @@ CONTROL activeButton;
 static CONTROL dumControl;
 static CONTROL tempControl;
 
+#include "shell.h"
 
 unsigned long save_area (int x, int y, int w, int h)
 {
  unsigned int ret;
  unsigned long xadr;
+ unsigned int size;
 
- ret = malloc ( (imagesize (x,y,x+w,y+h) >> 4) + 1 );
+ size = imagesize (x,y,x+w,y+h);
+
+ ret = malloc ( (size >> 4) + 1 );
  getimage (x,y,x+w,y+h,ret);
 
  xadr = HiMemoryAlloc ( imagesize (x,y,x+w,y+h) );
@@ -284,6 +290,14 @@ static char TempString2 [50] = {0,};
 HWND CreateWindow (int x, int y, int w, int h, char color, char* title)
 {
  // CONTROL LastEditBox;
+ 
+ if (( ((((unsigned long)w) / 8) + 1) * (unsigned long)h * 4) > 65520)
+ {
+    MessageBox ("Window too big"); 
+    Xgetch();     
+    return 0;   
+ }
+ 
 
  hidemouse ();
 
@@ -406,6 +420,7 @@ void DestroyWindow (HWND dmWnd)
  
  dm = (unsigned int) ( (unsigned long)(dmWnd) >> 16 );
  free (dm);
+
  showmouse ();
 
 
@@ -460,7 +475,7 @@ void SwitchWindow (HWND vhWnd)
  //CONTROL LastEditBox;
  unsigned int mret;
 
- if (is_full_app) return;
+ if (is_full_app == 1) return;
 
  if (vhWnd == topWnd) return;
 
@@ -484,8 +499,6 @@ void SwitchWindow (HWND vhWnd)
 	activeEditBox->x+(Xstrlen(TempString)*8)+5,
 	activeEditBox->y+16);
   }
-
-
 
  restore_area (vhWnd->x,vhWnd->y,vhWnd->w-8,vhWnd->h,vhWnd->form,0);
 
@@ -579,15 +592,18 @@ void MoveWindow (void)
  }
    XORRectangle (topWnd->x,topWnd->y,topWnd->x+topWnd->w,topWnd->y+topWnd->h);
    XORRectangle (oldWx,oldWy,oldWx+topWnd->w,oldWy+topWnd->h);
+ 
  if (topWnd->form == 0)
   topWnd->form = save_area (topWnd->x,topWnd->y,topWnd->w-8,topWnd->h);
  else
- {
+ { 
   mret = malloc ( (imagesize (topWnd->x,topWnd->y,topWnd->x+topWnd->w-8,topWnd->y+topWnd->h) >> 4) + 1 );
   getimage (topWnd->x,topWnd->y,topWnd->x+topWnd->w-8,topWnd->y+topWnd->h,mret);
   himem_write (mret,0,topWnd->form,imagesize (topWnd->x,topWnd->y,topWnd->x+topWnd->w-8,topWnd->y+topWnd->h) );
   free (mret);
  }
+
+
 
  SetColor (backc);
  waitretrace ();
@@ -620,7 +636,7 @@ void MessageBox (char* Msg)
 {
  unsigned int Lg;
  Lg = ( (strlen (Msg) * 8) / 2 );
- CreateWindow (320-Lg-15,200,(Lg*2)+20,50,3,"Desktop");
+ CreateWindow (320-Lg-15,200,(Lg*2)+20,50,3,Msg);
  OutTextXY ( 320 - Lg,220,Msg);
 }
 
@@ -867,7 +883,7 @@ void ShowMem (void)
  Line (145,210,405,210);
  Line (405,195,405,210);
  SetColor (9);
- Bar (146,161,146+ ( (260 * avail()) / 0x7000 ),174);
+ Bar (146,161,146+ ( (260 * (avail()<<4)) / 0x70000 ),174);
  Bar (146,196,146+ ( (260 * GetHiMemoryAvail ()) / HiMemoryAvailable () ),209);
  SetColor (0);
 }
@@ -1021,8 +1037,8 @@ char ReadKey (void)
 }
 
 
-#define COLOR_B 0
-#define COLOR_F 15
+#define COLOR_B 15
+#define COLOR_F 0
 #define COLOR_U 4
 
 char far *FarTABuffer;
@@ -1057,7 +1073,7 @@ void DispText (unsigned int ofs, unsigned int x, unsigned int y,
    {
     scroll_down (x,Y,w,h-(Y-y)-18,16);
     SetColor (COLOR_B);
-    Bar (x+1,Y,x+w-1,Y+16);
+    Bar (x+1,Y,x+w-3,Y+16);
     break;
    }
    else
@@ -1065,7 +1081,7 @@ void DispText (unsigned int ofs, unsigned int x, unsigned int y,
     if (update)
     {
      SetColor (COLOR_B);
-     Bar (X,Y,x+w-1,Y+16);
+     Bar (X,Y,x+w-3,Y+16);
     }
     X = x+5;
    }
@@ -1077,7 +1093,7 @@ void DispText (unsigned int ofs, unsigned int x, unsigned int y,
   else if (FarTABuffer [i] == 0)
   {
    //if (X == x+5)
-    Bar (X,Y,x+w-1,Y+16);
+    Bar (X,Y,x+w-3,Y+16);
    //else
    // Bar (X,Y,X+8,Y+16);
 
@@ -1109,7 +1125,7 @@ void DispText (unsigned int ofs, unsigned int x, unsigned int y,
  {
   SetColor (COLOR_B);
 //  Bar (x+1,Y,x+w-1,y+h-1);
-  Bar (x+1,Y,x+w-1,Y+16);
+  Bar (x+1,Y,x+w-3,Y+16);
  }
 
 
@@ -1212,11 +1228,12 @@ unsigned int TextArea (unsigned int x, unsigned int y, unsigned int w,
  unsigned int oldX,oldY;
  char cr;
 
+//w = w - 5;
 
 if (StrOfs == 1234)
 {
  SetColor (COLOR_B);
- fastbar (x,y,x+w,y+h);
+ fastbar (x,y,x+w-5,y+h);
 // FarTABuffer = (StrSeg * 65536) + StrOfs;
  FarTABuffer [SizeB] = 0;
  DispText (0,x,y,w,h,SizeB,x+5,y+5,3,0);
@@ -1259,7 +1276,7 @@ if (StrOfs == 1234)
       {
        scroll_down (x,y+1,w,h-18,16);
        SetColor (COLOR_B);
-       Bar (x+1,y+5,x+w-1,y+16+5);
+       Bar (x+1,y+5,x+w-3,y+16+5);
        SetColor (3);
        Y += 16;
        tad = (w/8)-2;
@@ -1286,7 +1303,7 @@ if (StrOfs == 1234)
       {
       scroll_down (x,y+1,w,h-18,16);
       SetColor (COLOR_B);
-      Bar (x+1,y+5,x+w-1,y+16+5);
+      Bar (x+1,y+5,x+w-3,y+16+5);
       SetColor (3);
       Y += 16;
       DispText (i-tad,x,y,w,h,i-tad+(w/8),x+5,Y,1,0);
@@ -1317,7 +1334,7 @@ if (StrOfs == 1234)
      {
       scroll_up (x,y+18,w,h-18,16);
       SetColor (COLOR_B);
-      Bar (x+1,y+h-16,x+w-1,y+h-1);
+      Bar (x+1,y+h-16,x+w-3,y+h-1);
       SetColor (3);
       Y = Y - 16;
       while (1)
@@ -1342,7 +1359,7 @@ if (StrOfs == 1234)
      {
       scroll_up (x,y+18,w,h-18,16);
       SetColor (COLOR_B);
-      Bar (x+1,y+h-16,x+w-1,y+h-1);
+      Bar (x+1,y+h-16,x+w-3,y+h-1);
       SetColor (3);
       Y = Y - 16;
       while (1)
@@ -1388,7 +1405,7 @@ if (StrOfs == 1234)
        {
 	scroll_down (x,y+1,w,h-18,16);
 	SetColor (COLOR_B);
-	Bar (x+1,y+5,x+w-1,y+16+5);
+	Bar (x+1,y+5,x+w-3,y+16+5);
 	SetColor (COLOR_F);
 	Y += 16;
 	tad = (w/8)-2;
@@ -1415,7 +1432,7 @@ if (StrOfs == 1234)
        {
 	scroll_down (x,y+1,w,h-18,16);
 	SetColor (COLOR_B);
-	Bar (x+1,y+5,x+w-1,y+16+5);
+	Bar (x+1,y+5,x+w-3,y+16+5);
 	SetColor (COLOR_F);
 	Y += 16;
 	DispText (i-tad-1,x,y,w,h,i-tad+(w/8),x+5,Y,1,0);
@@ -1475,7 +1492,7 @@ if (StrOfs == 1234)
       oldX = X;
       scroll_up (x,y+18,w,h-18,16);
       SetColor (COLOR_B);
-      Bar (x+1,y+h-16,x+w-1,y+h-1);
+      Bar (x+1,y+h-16,x+w-3,y+h-1);
       SetColor (3);
       Y = Y - 16;
       i++;
@@ -1515,7 +1532,7 @@ if (StrOfs == 1234)
      {
       scroll_up (x,y+18,w,h-18,16);
       SetColor (COLOR_B);
-      Bar (x+1,y+h-16,x+w-1,y+h-1);
+      Bar (x+1,y+h-16,x+w-3,y+h-1);
       SetColor (3);
       Y = Y - 16;
       for (oldi = i; ((X < (x+w-9-8)) && (FarTABuffer [oldi] != 13)) ; X += 8)
@@ -1542,7 +1559,7 @@ if (StrOfs == 1234)
      {
       scroll_up (x,y+18,w,h-18,16);
       SetColor (COLOR_B);
-      Bar (x+1,y+h-16,x+w-1,y+h-1);
+      Bar (x+1,y+h-16,x+w-3,y+h-1);
       SetColor (3);
       Y = Y - 16;
      }
@@ -1915,7 +1932,7 @@ CONTROL CreateControl (unsigned int x, unsigned int y, unsigned int w,
   break;
  case CONTROL_TYPE_TXTAREA:
   SetColor (COLOR_B);
-  Bar (x+hWnd->x+5,y+hWnd->y+20,x+hWnd->x+w+5,y+hWnd->y+h+20+1);
+  Bar (x+hWnd->x+5,y+hWnd->y+20,x+hWnd->x+w+2,y+hWnd->y+h+20+1);
 //  SetColor (15);
 //  Rectangle (x+hWnd->x+5+1,y+1+hWnd->y+20,x+hWnd->x+w+5-1,y+hWnd->y+h+20-1);
   FarTABuffer = (CapSegment * 65536) + CapOffset;
@@ -1967,6 +1984,7 @@ CONTROL CreateControl (unsigned int x, unsigned int y, unsigned int w,
 
 
 #define MOUSE_CLICK 0xA0
+#define KEYB_CLICK 0xA1
 
 int quit=0;
 unsigned int Xkey;
@@ -2113,8 +2131,13 @@ void WindowManager (void)
     case  7181: ExecuteControl (); break;
     case  7178: TickMenu (); break;
     default:
-
-	     EditBoxPut ( (char) Xkey );
+         if (is_control)
+	        EditBoxPut ( (char) Xkey );
+	     
+	     SysBuf.byte1 = KEYB_CLICK;
+         SysBuf.word1 = Xkey;
+         //MessageBox("WinMain"); 
+         if ( (topWnd->WinMain != 0) ) (topWnd->WinMain) ();
 
 	     break;
    }
@@ -2442,7 +2465,7 @@ void FullScreenShell (void)
 	int 0x10
      }
  shell = get_shell ();
- shell ();
+ shell ((char)0);
  _DS = _CS;
  if (gmode == 1)
   init640480 ();

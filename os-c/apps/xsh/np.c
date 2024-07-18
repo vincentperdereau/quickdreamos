@@ -120,15 +120,17 @@ char ButtonCaption [] = "exit";
 char bSave [] = "save";
 char bLoad [] = "load";
 
+unsigned int d = 150;
+
 void StartProgram ()
 {
- InitFullApp ();
- MyWindow = CreateWindow (0,0,600,410,"Notepad",&WinMain);
+ //InitFullApp ();
+ MyWindow = CreateWindow (0,0,605-d,410-d,"Notepad",&WinMain);
  MySegment = malloc (0xff0);
  ClearText (MySegment);
- MyControl = CreateControl (3,3,592,344,MyWindow,0,CONTROL_TYPE_TXTAREA,MySegment,0,0);
- CreateControl (8,360,200+100,20,MyWindow,0,CONTROL_TYPE_EDITBOX,_CS,(unsigned int)filename,0);
- CreateControl (210+100,360,40,20,MyWindow,BUTTON_SAVE,CONTROL_TYPE_BUTTON,_CS,(unsigned int)bSave,0);
- CreateControl (252+100,360,40,20,MyWindow,BUTTON_LOAD,CONTROL_TYPE_BUTTON,_CS,(unsigned int)bLoad,0);
+ MyControl = CreateControl (3,3,592-d,349-d,MyWindow,0,CONTROL_TYPE_TXTAREA,MySegment,0,0);
+ CreateControl (8,360-d,200+100,20,MyWindow,0,CONTROL_TYPE_EDITBOX,_CS,(unsigned int)filename,0);
+ CreateControl (210+100,360-d,40,20,MyWindow,BUTTON_SAVE,CONTROL_TYPE_BUTTON,_CS,(unsigned int)bSave,0);
+ CreateControl (252+100,360-d,40,20,MyWindow,BUTTON_LOAD,CONTROL_TYPE_BUTTON,_CS,(unsigned int)bLoad,0);
  loaded = 0;
 }

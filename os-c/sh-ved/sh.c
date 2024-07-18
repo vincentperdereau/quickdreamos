@@ -462,16 +462,29 @@ void doCmd (char* cmd)
   free (bufferbatch);
  }
 
- void far shell (void)
+ int far shell (char first)
  {
   _DS = _CS;
 
   while (1)
   {
-   puts (nl);
-   cputc (usedrive,7); cputc (':',7);cputs (prompt,7); cputc ('>',7);
+   
    memset (_CS,(uint)cmdsh,100,0);
-   gets (cmdsh,100);
+   
+   if (first > (char)2)
+   {
+             cputc(first, 7);
+             cmdsh[0] = first;  
+             gets (cmdsh, 100);
+   } 
+   else
+   {
+       puts (nl);
+       cputc (usedrive,7); cputc (':',7);cputs (prompt,7); cputc ('>',7);
+       if (first == (char)2) return 0;
+       gets (cmdsh,100);
+   }
+   
    memset (_CS,(uint)buf,100,0);
    strcpy (buf,cmdsh);
 
@@ -486,7 +499,26 @@ void doCmd (char* cmd)
 	   doCmd (cmdsh);
            _DS = _CS;
         }
+
+   if (is_xsh()) 
+   {
+      if (quit) 
+      {
+         asm {
+            mov al,1
+            int 0x29
+         }
+         quit = 0;
+         return 0;  
+      }                     
+      //puts (nl);
+      //cputc (usedrive,7); cputc (':',7);cputs (prompt,7); cputc ('>',7);
+      return 0;
+      //break;
+   }
+      
    if (quit) break;
+   
   }
  quit = 0;
  }
@@ -525,6 +557,6 @@ void doCmd (char* cmd)
 
   if (gui) exec ("/bin/xsh",0,0,1);
 
-  shell ();
+  shell ((char)0);
 
  }

@@ -5,5 +5,5 @@ tlink %1.obj
 exe2bin %1
 rem del *.exe
 del *.map
-tinyfs "rm /bin/%1"
-tinyfs "put %1.bin /bin/%1"
+tinyfs "rm /qwin/%1"
+tinyfs "put %1.bin /qwin/%1"

@@ -152,5 +152,7 @@
        pop      si
        pop      ds
       }
+      
  if  ( (!is_xsh()) && (check) && (avail() != tm) ) puts ("\n\rwarning: memory no released");
+ 
  }

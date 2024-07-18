@@ -16,6 +16,8 @@ extern void barasm1 (int x, int y, int x2, int y2, unsigned char color);
 extern void barasm2 (int x, int y, int x2, int y2, unsigned char color);
 extern void waitretrace (void);
 
+void OutTextXY (int X, int Y,char* s);
+
 #define         ON      0
 #define         OFF     1
 #define         BLUE            1
@@ -286,6 +288,29 @@ int abs (int n)
  else return (-n);
 }
 
+int deltaw;
+
+void writenum (int x, int y, unsigned long dw,char size)
+{
+ unsigned long i ; unsigned char b ;
+ int flag=0;
+ int j = 0;
+
+ if (size==8) i = 100;
+ if (size==16) i = 10000;
+ if (size==32) i = 1000000000;
+
+ for (;i!=0;i/=10)
+ {
+ b = dw / i ; dw = dw - (b*i) ;
+ if (b) flag = 1;
+ if (flag) PrintChar (b+48,x+(j<<3) ,y + deltaw,0,255,0);
+ if ( (!i) && (!flag)) PrintChar (48,x+(j<<3) ,y + deltaw,0,255,0);
+ j = j + 1;
+ }
+ deltaw = deltaw + 8;
+}
+
 unsigned int imagesize(unsigned int x,unsigned int y,
 		       unsigned int x0,unsigned int y0)
 {
@@ -294,12 +319,17 @@ unsigned int sx,sy;
 
   sx = (abs(x0-x) / 8)+1;
   sy = (abs(y0-y))+1;
-  dummy = sx*sy*4+10;        
+  dummy = (unsigned long)sx*(unsigned long)sy*4+10;   
+  
+  //writenum (10,400,sx,16);
+  //writenum (110,400-8,sy,16);
+  //writenum (210,400-16,dummy,32);
+   
   if (dummy<65520) 
     return dummy;
   else
     {
-     MessageBox ("CreateWindow ()... Failed");
+     halt();
      return 0;
     }
 }

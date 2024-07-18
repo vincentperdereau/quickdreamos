@@ -60,17 +60,39 @@ taskA_l:
  out 70h,al
  in al,71h
  mov di,140
+ cli
  call print_hex_byte
+ sti
  mov al,2
  out 70h,al
  in al,71h
  mov di,146
+ cli
  call print_hex_byte
+ sti
  mov al,0
  out 70h,al
  in al,71h
  mov di,152
+ cli
  call print_hex_byte
+ sti
+ mov cl,al
+ shr al,4
+ xor ah,ah
+ mov bx,offset hex_map
+ add bx,ax
+ mov al,[bx]
+ mov es:[di],al
+ mov al,cl
+ and al,0fh
+ mov bx,offset hex_map
+ add bx,ax
+ mov al,[bx]
+ add di,2
+ mov es:[di],al
+ sub di,2
+
  jmp taskA_l                  ; boucle infini
 
 ; ** taskB: attend la pression de la touche ESC
